@@ -1,0 +1,90 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+  background: linear-gradient(135deg, #f0f4ff, #e0e7ff); /* subtle gradient */
+  border-radius: 1rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); /* soft card-like shadow */
+  transition: transform 0.3s ease;
+}
+#root:hover {
+  transform: scale(1.02); /* subtle zoom on hover */
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter, transform;
+  transition: filter 300ms, transform 300ms;
+  cursor: pointer;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+  transform: rotate(-10deg) scale(1.05); /* playful tilt on hover */
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+  background: #fff;
+  border-radius: 1rem;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.card:hover {
+  transform: translateY(-10px); /* lift effect */
+  box-shadow: 0 15px 30px rgba(0,0,0,0.1);
+}
+
+.read-the-docs {
+  color: #888;
+  position: relative;
+  font-weight: 500;
+}
+.read-the-docs::after {
+  content: '';
+  display: block;
+  width: 0%;
+  height: 2px;
+  background: #646cff;
+  transition: width 0.3s ease;
+  margin: 0.2em auto 0;
+}
+.read-the-docs:hover::after {
+  width: 50%; /* animated underline */
+}
+
+/* NEW UNIQUE FEATURES */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 5px #646cff33; }
+  50% { box-shadow: 0 0 20px #646cff77; }
+}
+
+.card.pulse {
+  animation: glow-pulse 2s infinite;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #f5f7ff;
+  transition: background 0.5s;
+}
+body.night-mode {
+  background: #1a1b2f;
+  color: #e0e0ff;
+}
+
