@@ -10,7 +10,7 @@ import { WishlistProvider } from "./contexts/WishlistContext";
 import { CompareProvider } from "./contexts/CompareContext";
 
 import Index from "./pages/Index";
-import PGList from "./pages/PGList";
+import PGList from "./pages/PGList"; 
 import PGDetail from "./pages/PGDetail";
 import Wishlist from "./pages/Wishlist";
 import Compare from "./pages/Compare";
