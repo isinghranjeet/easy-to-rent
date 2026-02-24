@@ -1,55 +1,124 @@
+// Wishlist.tsx
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, ArrowLeft, Filter } from 'lucide-react';
+import { Heart, ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { useWishlist } from '@/contexts/WishlistContext';
-import { useToast } from '@/hooks/use-toast';
 import { PGCard } from '@/components/pg/PGCard';
+import { toast } from 'sonner';
+import { transformPGData, TransformedPG } from '@/lib/utils/pgTransformer';
 
-// Mock data - replace with actual API call
-const mockPGs = [
-  {
-    id: '1',
-    name: 'Luxury PG for Professionals',
-    slug: 'luxury-pg-professionals',
-    description: 'Premium PG with all modern amenities',
-    price: 15000,
-    images: ['https://example.com/pg1.jpg'],
-    city: 'Delhi',
-    locality: 'Connaught Place',
-    type: 'co-ed' as const,
-    amenities: ['wifi', 'ac', 'parking'],
-    rating: 4.5,
-    reviewCount: 120,
-    featured: true,
-    verified: true,
-    wifi: true,
-    meals: true,
-    ac: true,
-    parking: true,
-  },
-  // Add more mock data as needed
-];
+// API URL
+const API_URL = 'https://eassy-to-rent-backend.onrender.com/api';
 
 const Wishlist = () => {
   const { wishlist, toggleWishlist, clearWishlist } = useWishlist();
-  const { toast } = useToast();
-  const [wishlistPGs, setWishlistPGs] = useState<any[]>([]);
+  const [wishlistPGs, setWishlistPGs] = useState<TransformedPG[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Filter PGs that are in the wishlist
-    const filtered = mockPGs.filter(pg => wishlist.includes(pg.id));
-    setWishlistPGs(filtered);
+    if (wishlist.length > 0) {
+      fetchWishlistPGs();
+    } else {
+      setWishlistPGs([]);
+      setLoading(false);
+    }
   }, [wishlist]);
+
+  const fetchWishlistPGs = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Fetch each PG by ID
+      const fetchPromises = wishlist.map(async (id) => {
+        try {
+          const response = await fetch(`${API_URL}/pg/${id}`);
+          if (!response.ok) return null;
+          const result = await response.json();
+          return result.success ? result.data : null;
+        } catch (err) {
+          console.error(`Error fetching PG ${id}:`, err);
+          return null;
+        }
+      });
+      
+      const results = await Promise.all(fetchPromises);
+      const validPGs = results.filter(pg => pg !== null);
+      
+      // Transform the data using the utility function
+      const transformedPGs = validPGs.map(pg => transformPGData(pg));
+      
+      setWishlistPGs(transformedPGs);
+      
+      if (transformedPGs.length === 0) {
+        toast.error('No valid PG details found in wishlist');
+      }
+      
+    } catch (err: any) {
+      console.error('Error fetching wishlist PGs:', err);
+      setError(err.message);
+      toast.error('Failed to load wishlist items');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleClearWishlist = () => {
     clearWishlist();
-    toast({
-      title: 'Wishlist Cleared',
+    toast.success('Wishlist Cleared', {
       description: 'All items have been removed from your wishlist',
     });
   };
+
+  const handleRemoveItem = (pgId: string, pgName: string) => {
+    toggleWishlist(pgId);
+    toast.success('Removed from Wishlist', {
+      description: `${pgName} has been removed from your wishlist`,
+    });
+  };
+
+  // Calculate stats
+  const totalValue = wishlistPGs.reduce((sum, pg) => sum + (pg.price || 0), 0);
+  const avgRating = wishlistPGs.length > 0 
+    ? (wishlistPGs.reduce((sum, pg) => sum + (pg.rating || 0), 0) / wishlistPGs.length).toFixed(1)
+    : '0.0';
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center py-24">
+            <Loader2 className="h-12 w-12 text-primary animate-spin mx-auto mb-4" />
+            <p className="text-muted-foreground">Loading your wishlist...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+        <div className="container mx-auto px-4 py-8">
+          <Card className="max-w-2xl mx-auto">
+            <CardContent className="pt-6 pb-6">
+              <div className="text-center py-12">
+                <div className="mx-auto mb-4 h-20 w-20 rounded-full bg-destructive/10 flex items-center justify-center">
+                  <Heart className="h-10 w-10 text-destructive" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2">Error Loading Wishlist</h3>
+                <p className="text-muted-foreground mb-6">{error}</p>
+                <Button onClick={() => window.location.reload()}>Try Again</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
@@ -114,7 +183,7 @@ const Wishlist = () => {
                 <CardContent className="pt-6">
                   <div className="text-center">
                     <p className="text-3xl font-bold text-primary">
-                      ₹{wishlistPGs.reduce((sum, pg) => sum + pg.price, 0).toLocaleString()}
+                      ₹{totalValue.toLocaleString()}
                     </p>
                     <p className="text-sm text-muted-foreground">Total Monthly Value</p>
                   </div>
@@ -124,9 +193,7 @@ const Wishlist = () => {
               <Card>
                 <CardContent className="pt-6">
                   <div className="text-center">
-                    <p className="text-3xl font-bold text-primary">
-                      {(wishlistPGs.reduce((sum, pg) => sum + pg.rating, 0) / wishlistPGs.length).toFixed(1)}
-                    </p>
+                    <p className="text-3xl font-bold text-primary">{avgRating}</p>
                     <p className="text-sm text-muted-foreground">Average Rating</p>
                   </div>
                 </CardContent>
@@ -136,9 +203,27 @@ const Wishlist = () => {
             {/* Property Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {wishlistPGs.map((pg, index) => (
-                <PGCard key={pg.id} pg={pg} index={index} />
+                <div key={pg._id || pg.id} className="relative group">
+                  <PGCard pg={pg} index={index} />
+                  <button
+                    onClick={() => handleRemoveItem(pg._id || pg.id || '', pg.name)}
+                    className="absolute top-2 right-2 z-10 p-2 bg-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50"
+                    title="Remove from wishlist"
+                  >
+                    <Heart className="h-4 w-4 fill-red-500 text-red-500" />
+                  </button>
+                </div>
               ))}
             </div>
+
+            {/* Empty state note if some items failed to load */}
+            {wishlist.length > wishlistPGs.length && (
+              <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-700 text-center">
+                  ⚠️ Some items in your wishlist could not be loaded. They may have been removed or are unavailable.
+                </p>
+              </div>
+            )}
           </>
         )}
       </div>

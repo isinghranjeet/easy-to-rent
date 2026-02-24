@@ -5,7 +5,8 @@ import { Footer } from '@/components/layout/Footer';
 import { PGCard } from '@/components/pg/PGCard';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { toast } from 'sonner';
-import { Loader2, AlertCircle, Search, Grid, List } from 'lucide-react';
+import { Loader2, AlertCircle, Search, Grid, List, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { transformPGData } from '@/lib/utils/pgTransformer';
 
 // Updated to use your Render backend
 const API_URL = 'https://eassy-to-rent-backend.onrender.com/api';
@@ -45,13 +46,28 @@ const PGList = () => {
   
   const [listings, setListings] = useState<PGListing[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   
   const debouncedSearch = useDebounce(searchQuery, 300);
 
+  // Fetch first page on mount
   useEffect(() => {
-    fetchListings();
+    fetchListings(1, true);
   }, []);
+
+  // Fetch when filters change (reset to page 1)
+  useEffect(() => {
+    if (!loading) {
+      fetchListings(1, true);
+    }
+  }, [selectedLocation, selectedType, sortBy, debouncedSearch]);
 
   useEffect(() => {
     if (searchParams.get('q')) setSearchQuery(searchParams.get('q') || '');
@@ -59,15 +75,36 @@ const PGList = () => {
     if (searchParams.get('type')) setSelectedType(searchParams.get('type') || 'all');
   }, [searchParams]);
 
-  const fetchListings = async () => {
+  const fetchListings = async (page = 1, reset = false) => {
     try {
-      setLoading(true);
+      if (reset) {
+        setLoading(true);
+        setListings([]);
+      } else {
+        setLoadingMore(true);
+      }
+      
       setError(null);
       
-      const url = `${API_URL}/pg`;
-      console.log('Fetching listings from Render backend:', url);
+      // Build URL with pagination parameters
+      const url = new URL(`${API_URL}/pg`);
+      url.searchParams.append('page', page.toString());
+      url.searchParams.append('limit', '20'); // 20 items per page
       
-      const response = await fetch(url);
+      // Add filters if needed (if your backend supports them)
+      if (selectedType !== 'all') {
+        url.searchParams.append('type', selectedType);
+      }
+      if (selectedLocation !== 'all') {
+        url.searchParams.append('city', selectedLocation);
+      }
+      if (debouncedSearch) {
+        url.searchParams.append('search', debouncedSearch);
+      }
+      
+      console.log('Fetching listings from:', url.toString());
+      
+      const response = await fetch(url.toString());
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -80,56 +117,39 @@ const PGList = () => {
         throw new Error(result.message || 'API request failed');
       }
       
-      const listingsData = result.data || [];
-      const listingsArray = Array.isArray(listingsData) ? listingsData : [];
+      // Extract data from response
+      const listingsData = result.data?.items || [];
+      const newTotalCount = result.data?.total || 0;
+      const newTotalPages = result.data?.pages || 1;
+      const currentPageData = result.data?.page || 1;
       
-      if (listingsArray.length === 0) {
-        console.log('No data received from API');
-        toast.info('No PG listings found. Please add some listings.');
+      setTotalCount(newTotalCount);
+      setTotalPages(newTotalPages);
+      setCurrentPage(currentPageData);
+      setHasMore(currentPageData < newTotalPages);
+      
+      if (!Array.isArray(listingsData)) {
+        console.warn('Listings data is not an array:', listingsData);
+        if (reset) setListings([]);
         return;
       }
       
-      console.log(`Received ${listingsArray.length} listings from database`);
+      console.log(`Received ${listingsData.length} listings from database (Page ${currentPageData}/${newTotalPages}, Total: ${newTotalCount})`);
       
-      const transformedListings: PGListing[] = listingsArray.map((listing: any) => {
-        // Ensure we have valid images
-        let images = ['https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&auto=format&fit=crop&q=80'];
-        if (Array.isArray(listing.images) && listing.images.length > 0) {
-          images = listing.images.filter((img: string) => img && img.trim() !== '');
-        }
-        
-        // Ensure we have valid amenities
-        let amenities = ['WiFi', 'Power Backup'];
-        if (Array.isArray(listing.amenities) && listing.amenities.length > 0) {
-          amenities = listing.amenities.filter((a: string) => a && a.trim() !== '');
-        }
-        
-        return {
-          _id: listing._id?.toString(),
-          name: listing.name || 'Premium PG',
-          description: listing.description || 'Comfortable accommodation with amenities',
-          city: listing.city || 'Chandigarh',
-          address: listing.address || 'Location',
-          price: listing.price || 0,
-          type: (listing.type as 'boys' | 'girls' | 'co-ed' | 'family') || 'boys',
-          images: images,
-          amenities: amenities,
-          verified: Boolean(listing.verified),
-          featured: Boolean(listing.featured),
-          rating: listing.rating || 4.0,
-          reviewCount: listing.reviewCount || 0,
-          ownerName: listing.ownerName || 'Owner',
-          ownerPhone: listing.ownerPhone || '',
-          createdAt: listing.createdAt || new Date().toISOString(),
-          slug: listing.slug,
-          distance: listing.distance,
-          locality: listing.locality,
-          location: listing.city,
-          published: listing.published
-        };
-      });
+      // ✅ UPDATED: Use the transformer utility
+      const transformedListings = listingsData.map((listing: any) => transformPGData(listing));
       
-      setListings(transformedListings);
+      if (reset) {
+        setListings(transformedListings);
+      } else {
+        setListings(prev => [...prev, ...transformedListings]);
+      }
+      
+      if (reset && transformedListings.length === 0) {
+        toast.info('No PG listings found. Add some listings to get started.');
+      } else if (reset) {
+        toast.success(`Loaded ${transformedListings.length} PG listings`);
+      }
       
     } catch (err: any) {
       console.error('Error fetching listings:', err);
@@ -137,58 +157,46 @@ const PGList = () => {
       toast.error('Failed to load PG listings');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  const loadMore = () => {
+    if (hasMore && !loadingMore) {
+      fetchListings(currentPage + 1, false);
     }
   };
 
   const filteredPGs = useMemo(() => {
-    let filtered = listings.filter((pg) => {
-      if (debouncedSearch) {
-        const searchLower = debouncedSearch.toLowerCase();
-        const matchesSearch = 
-          (pg.name?.toLowerCase() || '').includes(searchLower) ||
-          (pg.description?.toLowerCase() || '').includes(searchLower) ||
-          (pg.address?.toLowerCase() || '').includes(searchLower) ||
-          (pg.city?.toLowerCase() || '').includes(searchLower) ||
-          (pg.locality?.toLowerCase() || '').includes(searchLower);
-        
-        if (!matchesSearch) return false;
-      }
-
-      if (selectedLocation !== 'all') {
-        const pgLocation = pg.location || pg.city || '';
-        if (pgLocation.toLowerCase() !== selectedLocation.toLowerCase()) {
-          return false;
-        }
-      }
-
-      if (selectedType !== 'all' && pg.type !== selectedType) {
-        return false;
-      }
-
-      return true;
-    });
+    // Since we're fetching filtered data from backend, this is now just for client-side sorting
+    let filtered = [...listings];
 
     // Sort the filtered results
     filtered.sort((a, b) => {
       switch (sortBy) {
-        case 'price_asc': return a.price - b.price;
-        case 'price_desc': return b.price - a.price;
-        case 'rating': return b.rating - a.rating;
-        case 'newest': return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        default: return 0;
+        case 'price_asc': 
+          return a.price - b.price;
+        case 'price_desc': 
+          return b.price - a.price;
+        case 'rating': 
+          return (b.rating || 0) - (a.rating || 0);
+        case 'newest': 
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        default: 
+          return 0;
       }
     });
 
     return filtered;
-  }, [listings, debouncedSearch, selectedLocation, selectedType, sortBy]);
+  }, [listings, sortBy]);
 
   const locations = useMemo(() => {
     const uniqueLocations = new Set<string>();
     listings.forEach(pg => {
-      const location = pg.location || pg.city;
-      if (location) uniqueLocations.add(location);
+      if (pg.city) uniqueLocations.add(pg.city);
+      if (pg.locality) uniqueLocations.add(pg.locality);
     });
-    return ['all', ...Array.from(uniqueLocations)];
+    return ['all', ...Array.from(uniqueLocations)].filter(Boolean);
   }, [listings]);
 
   const clearFilters = () => {
@@ -199,8 +207,7 @@ const PGList = () => {
   };
 
   const refreshListings = () => {
-    fetchListings();
-    toast.info('Refreshing listings...');
+    fetchListings(1, true);
   };
 
   if (loading) {
@@ -209,8 +216,9 @@ const PGList = () => {
         <Navbar />
         <div className="container mx-auto px-4 py-12">
           <div className="text-center py-24">
-            <Loader2 className="h-12 w-12 text-gray-400 animate-spin mx-auto mb-4" />
+            <Loader2 className="h-12 w-12 text-blue-600 animate-spin mx-auto mb-4" />
             <p className="text-gray-600">Loading accommodations...</p>
+            <p className="text-sm text-gray-400 mt-2">Fetching from backend...</p>
           </div>
         </div>
         <Footer />
@@ -229,13 +237,15 @@ const PGList = () => {
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Find PG Accommodations</h1>
               <p className="text-gray-600">
-                {listings.length} accommodations available
+                {totalCount} accommodations available
+                {listings.length > 0 && ` (showing ${listings.length} of ${totalCount})`}
               </p>
             </div>
             <button
               onClick={refreshListings}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm transition-colors"
             >
+              <RefreshCw className="h-4 w-4" />
               Refresh Listings
             </button>
           </div>
@@ -258,10 +268,14 @@ const PGList = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
             <p className="text-gray-600">
-              Showing <span className="font-semibold">{filteredPGs.length}</span> of {listings.length} results
+              Showing <span className="font-semibold">{filteredPGs.length}</span> of {totalCount} results
+              {currentPage > 1 && ` (Page ${currentPage} of ${totalPages})`}
             </p>
             {error && (
-              <p className="text-sm text-red-600 mt-1">{error}</p>
+              <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
+                <AlertCircle className="h-4 w-4" />
+                {error}
+              </p>
             )}
           </div>
           
@@ -324,8 +338,6 @@ const PGList = () => {
             >
               Co-ed PG
             </button>
-
-            
             
             <select
               value={selectedLocation}
@@ -350,29 +362,71 @@ const PGList = () => {
 
         {/* Results */}
         {filteredPGs.length > 0 ? (
-          <div className={viewMode === 'grid' 
-            ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" 
-            : "space-y-4"
-          }>
-            {filteredPGs.map((pg) => (
-              <PGCard key={pg._id} pg={pg} />
-            ))}
-          </div>
+          <>
+            <div className={viewMode === 'grid' 
+              ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" 
+              : "space-y-4"
+            }>
+              {filteredPGs.map((pg) => (
+                <PGCard key={pg._id} pg={pg} />
+              ))}
+            </div>
+
+            {/* Load More Button */}
+            {hasMore && (
+              <div className="mt-8 text-center">
+                <button
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                >
+                  {loadingMore ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      Load More
+                      <ChevronRight className="h-4 w-4" />
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* Pagination Info */}
+            <div className="mt-4 text-center text-sm text-gray-500">
+              Page {currentPage} of {totalPages} • {totalCount} total listings
+            </div>
+          </>
         ) : (
-          <div className="text-center py-12">
+          <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
             <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Search className="h-10 w-10 text-gray-400" />
             </div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">No accommodations found</h3>
-            <p className="text-gray-600 mb-6">
-              Try adjusting your search criteria
+            <p className="text-gray-600 mb-6 max-w-md mx-auto">
+              {totalCount === 0 
+                ? "No PG listings available in the database yet. Add some listings to get started."
+                : "Try adjusting your search or filter criteria to find what you're looking for."}
             </p>
-            <button
-              onClick={clearFilters}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Clear Filters
-            </button>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={clearFilters}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Clear Filters
+              </button>
+              {totalCount === 0 && (
+                <button
+                  onClick={refreshListings}
+                  className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Refresh
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -381,11 +435,11 @@ const PGList = () => {
           <div className="mt-8 p-4 bg-red-50 border border-red-200 rounded-lg">
             <div className="flex items-center gap-2 text-red-700">
               <AlertCircle className="h-5 w-5" />
-              <p className="text-sm">{error}</p>
+              <p className="text-sm font-medium">{error}</p>
             </div>
             <button
-              onClick={fetchListings}
-              className="mt-2 px-4 py-2 bg-red-100 text-red-700 rounded hover:bg-red-200 text-sm"
+              onClick={() => fetchListings(1, true)}
+              className="mt-2 px-4 py-2 bg-red-100 text-red-700 rounded hover:bg-red-200 text-sm transition-colors"
             >
               Retry
             </button>

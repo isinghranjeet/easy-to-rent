@@ -1,97 +1,94 @@
+// Compare.tsx
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { GitCompare, ArrowLeft, X, CheckCircle, AlertCircle } from 'lucide-react';
+import { GitCompare, ArrowLeft, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCompare } from '@/contexts/CompareContext';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
+import { transformPGData, TransformedPG } from '@/lib/utils/pgTransformer';
 
-// Mock data - replace with actual API call
-const mockPGs = [
-  {
-    id: '1',
-    name: 'Luxury PG for Professionals',
-    slug: 'luxury-pg-professionals',
-    description: 'Premium PG with all modern amenities',
-    price: 15000,
-    images: ['https://example.com/pg1.jpg'],
-    city: 'Delhi',
-    locality: 'Connaught Place',
-    type: 'co-ed' as const,
-    amenities: ['wifi', 'ac', 'parking', 'meals'],
-    rating: 4.5,
-    reviewCount: 120,
-    featured: true,
-    verified: true,
-    wifi: true,
-    meals: true,
-    ac: true,
-    parking: true,
-    ownerName: 'John Doe',
-    ownerPhone: '9876543210',
-  },
-  {
-    id: '2',
-    name: 'Budget Girls PG',
-    slug: 'budget-girls-pg',
-    description: 'Affordable and secure PG for girls',
-    price: 8000,
-    images: ['https://example.com/pg2.jpg'],
-    city: 'Mumbai',
-    locality: 'Andheri',
-    type: 'girls' as const,
-    amenities: ['wifi', 'meals'],
-    rating: 4.2,
-    reviewCount: 85,
-    featured: false,
-    verified: true,
-    wifi: true,
-    meals: true,
-    ac: false,
-    parking: false,
-    ownerName: 'Jane Smith',
-    ownerPhone: '9876543211',
-  },
-  // Add more mock data as needed
-];
+// API URL
+const API_URL = 'https://eassy-to-rent-backend.onrender.com/api';
 
 const Compare = () => {
   const { compareList, removeFromCompare, clearCompare, maxCompareLimit } = useCompare();
-  const { toast } = useToast();
-  const [comparePGs, setComparePGs] = useState<any[]>([]);
+  const [comparePGs, setComparePGs] = useState<TransformedPG[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Filter PGs that are in the compare list
-    const filtered = mockPGs.filter(pg => compareList.includes(pg.id));
-    setComparePGs(filtered);
+    if (compareList.length > 0) {
+      fetchComparePGs();
+    } else {
+      setComparePGs([]);
+      setLoading(false);
+    }
   }, [compareList]);
+
+  const fetchComparePGs = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Fetch each PG by ID
+      const fetchPromises = compareList.map(async (id) => {
+        try {
+          const response = await fetch(`${API_URL}/pg/${id}`);
+          if (!response.ok) return null;
+          const result = await response.json();
+          return result.success ? result.data : null;
+        } catch (err) {
+          console.error(`Error fetching PG ${id}:`, err);
+          return null;
+        }
+      });
+      
+      const results = await Promise.all(fetchPromises);
+      const validPGs = results.filter(pg => pg !== null);
+      
+      // Transform the data using the utility function
+      const transformedPGs = validPGs.map(pg => transformPGData(pg));
+      
+      setComparePGs(transformedPGs);
+      
+      if (transformedPGs.length === 0) {
+        toast.error('No valid PG details found');
+      }
+      
+    } catch (err: any) {
+      console.error('Error fetching compare PGs:', err);
+      setError(err.message);
+      toast.error('Failed to load comparison data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleRemoveFromCompare = (pgId: string, pgName: string) => {
     removeFromCompare(pgId);
-    toast({
-      title: 'Removed from Compare',
+    toast.success('Removed from Compare', {
       description: `${pgName} has been removed from comparison`,
     });
   };
 
   const handleClearCompare = () => {
     clearCompare();
-    toast({
-      title: 'Comparison Cleared',
+    toast.success('Comparison Cleared', {
       description: 'All items have been removed from comparison',
     });
   };
 
   // Comparison fields
   const comparisonFields = [
-    { key: 'price', label: 'Price (per month)', format: (value: number) => `₹${value.toLocaleString()}` },
-    { key: 'type', label: 'Type', format: (value: string) => value.charAt(0).toUpperCase() + value.slice(1) },
-    { key: 'city', label: 'City', format: (value: string) => value },
-    { key: 'locality', label: 'Locality', format: (value: string) => value },
-    { key: 'rating', label: 'Rating', format: (value: number) => value.toFixed(1) },
-    { key: 'reviewCount', label: 'Reviews', format: (value: number) => value },
+    { key: 'price', label: 'Price (per month)', format: (value: number) => `₹${value?.toLocaleString() || 0}` },
+    { key: 'type', label: 'Type', format: (value: string) => value ? value.charAt(0).toUpperCase() + value.slice(1) : 'N/A' },
+    { key: 'city', label: 'City', format: (value: string) => value || 'N/A' },
+    { key: 'locality', label: 'Locality', format: (value: string) => value || 'N/A' },
+    { key: 'rating', label: 'Rating', format: (value: number) => value ? value.toFixed(1) : '0.0' },
+    { key: 'reviewCount', label: 'Reviews', format: (value: number) => value || 0 },
     { key: 'wifi', label: 'WiFi', format: (value: boolean) => value ? '✅ Yes' : '❌ No' },
     { key: 'meals', label: 'Meals Included', format: (value: boolean) => value ? '✅ Yes' : '❌ No' },
     { key: 'ac', label: 'AC Rooms', format: (value: boolean) => value ? '✅ Yes' : '❌ No' },
@@ -99,6 +96,40 @@ const Compare = () => {
     { key: 'featured', label: 'Featured', format: (value: boolean) => value ? '⭐ Yes' : 'No' },
     { key: 'verified', label: 'Verified', format: (value: boolean) => value ? '✅ Yes' : '❌ No' },
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center py-24">
+            <Loader2 className="h-12 w-12 text-primary animate-spin mx-auto mb-4" />
+            <p className="text-muted-foreground">Loading comparison data...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+        <div className="container mx-auto px-4 py-8">
+          <Card className="max-w-2xl mx-auto">
+            <CardContent className="pt-6 pb-6">
+              <div className="text-center py-12">
+                <div className="mx-auto mb-4 h-20 w-20 rounded-full bg-destructive/10 flex items-center justify-center">
+                  <X className="h-10 w-10 text-destructive" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2">Error Loading Data</h3>
+                <p className="text-muted-foreground mb-6">{error}</p>
+                <Button onClick={() => window.location.reload()}>Try Again</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
@@ -145,24 +176,25 @@ const Compare = () => {
                   <Link to="/pg">
                     <Button>Browse Properties</Button>
                   </Link>
-                  <Link to="/wishlist">
-                    <Button variant="outline">View Wishlist</Button>
-                  </Link>
                 </div>
               </div>
             </CardContent>
           </Card>
         ) : (
           <>
-            {/* Property Cards Header */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {/* Property Cards Header - Responsive grid */}
+            <div className={`grid gap-4 mb-8 ${
+              comparePGs.length === 2 ? 'grid-cols-1 md:grid-cols-2' :
+              comparePGs.length === 3 ? 'grid-cols-1 md:grid-cols-3' :
+              'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'
+            }`}>
               {comparePGs.map((pg) => (
-                <Card key={pg.id} className="relative">
+                <Card key={pg._id || pg.id} className="relative">
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="absolute top-2 right-2 h-8 w-8 p-0"
-                    onClick={() => handleRemoveFromCompare(pg.id, pg.name)}
+                    className="absolute top-2 right-2 h-8 w-8 p-0 rounded-full hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => handleRemoveFromCompare(pg._id || pg.id || '', pg.name)}
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -171,18 +203,31 @@ const Compare = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      <p className="text-2xl font-bold text-primary">₹{pg.price.toLocaleString()}</p>
+                      <p className="text-2xl font-bold text-primary">₹{pg.price?.toLocaleString() || 0}</p>
                       <p className="text-sm text-muted-foreground">
-                        {pg.locality}, {pg.city}
+                        {pg.locality || pg.city}, {pg.city}
                       </p>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={pg.type === 'boys' ? 'default' : 
-                                  pg.type === 'girls' ? 'secondary' : 'outline'}>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant={
+                          pg.type === 'boys' ? 'default' : 
+                          pg.type === 'girls' ? 'secondary' : 
+                          'outline'
+                        }>
                           {pg.type === 'boys' ? '👦 Boys' : 
                            pg.type === 'girls' ? '👧 Girls' : 
-                           '👫 Co-ed'}
+                           pg.type === 'co-ed' ? '👫 Co-ed' : 
+                           '👪 Family'}
                         </Badge>
-                        {pg.featured && <Badge className="bg-yellow-500">⭐ Featured</Badge>}
+                        {pg.featured && (
+                          <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white">
+                            ⭐ Featured
+                          </Badge>
+                        )}
+                        {pg.verified && (
+                          <Badge variant="outline" className="border-green-500 text-green-600">
+                            ✅ Verified
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -200,9 +245,9 @@ const Compare = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[200px]">Feature</TableHead>
+                        <TableHead className="w-[200px] bg-muted/50">Feature</TableHead>
                         {comparePGs.map((pg) => (
-                          <TableHead key={pg.id} className="text-center">
+                          <TableHead key={pg._id || pg.id} className="text-center bg-muted/50">
                             {pg.name}
                           </TableHead>
                         ))}
@@ -210,11 +255,11 @@ const Compare = () => {
                     </TableHeader>
                     <TableBody>
                       {comparisonFields.map((field) => (
-                        <TableRow key={field.key}>
+                        <TableRow key={field.key} className="hover:bg-muted/30">
                           <TableCell className="font-medium">{field.label}</TableCell>
                           {comparePGs.map((pg) => (
-                            <TableCell key={`${pg.id}-${field.key}`} className="text-center">
-                              {field.format(pg[field.key])}
+                            <TableCell key={`${pg._id || pg.id}-${field.key}`} className="text-center">
+                              {field.format(pg[field.key as keyof TransformedPG] as any)}
                             </TableCell>
                           ))}
                         </TableRow>
@@ -226,25 +271,26 @@ const Compare = () => {
             </Card>
 
             {/* Action Buttons */}
-            <div className="flex justify-center gap-4 mt-8">
-              <Link to={`/pg/${comparePGs[0]?.slug}`}>
-                <Button>View {comparePGs[0]?.name}</Button>
-              </Link>
-              {comparePGs.length > 1 && (
-                <Link to={`/pg/${comparePGs[1]?.slug}`}>
-                  <Button variant="outline">View {comparePGs[1]?.name}</Button>
+            <div className="flex flex-wrap justify-center gap-4 mt-8">
+              {comparePGs.map((pg, index) => (
+                <Link key={pg._id || pg.id} to={`/pg/${pg._id || pg.id}`}>
+                  <Button variant={index === 0 ? 'default' : 'outline'}>
+                    View {pg.name}
+                  </Button>
                 </Link>
-              )}
+              ))}
             </div>
           </>
         )}
 
         {/* Tips */}
         {comparePGs.length > 0 && comparePGs.length < maxCompareLimit && (
-          <Card className="mt-8">
+          <Card className="mt-8 bg-primary/5 border-primary/20">
             <CardContent className="pt-6">
               <div className="flex items-start gap-3">
-                <AlertCircle className="h-5 w-5 text-primary mt-0.5" />
+                <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center mt-0.5">
+                  <span className="text-primary text-xs">💡</span>
+                </div>
                 <div>
                   <h4 className="font-medium mb-1">Tip: Add more properties</h4>
                   <p className="text-sm text-muted-foreground">
