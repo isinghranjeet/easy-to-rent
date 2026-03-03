@@ -32,7 +32,7 @@ const About = () => {
   
   const chatEndRef = useRef<HTMLDivElement>(null);
   const featuresRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   // Phone number (hidden from screen but fully functional)
   const supportPhone = '9315058665'; // Your actual number
@@ -305,7 +305,7 @@ const About = () => {
 
   const closeTeamMemberProfile = () => {
     setSelectedTeamMember(null);
-    document.body.style.overflow = 'auto';
+    document.body.style.overflow = '';
   };
 
   const selectedMember = team.find(member => member.id === selectedTeamMember);
