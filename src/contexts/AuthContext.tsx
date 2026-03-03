@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/contexts/AuthContext.tsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api, User, LoginCredentials, RegisterCredentials } from '@/services/api';
@@ -9,7 +10,7 @@ interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string, phone?: string) => Promise<void>;
+  register: (name: string, email: string, password: string, phone?: string, role?: 'user' | 'owner') => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (userData: Partial<User>) => void;
 }
@@ -82,12 +83,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const register = async (name: string, email: string, password: string, phone?: string) => {
+  const register = async (name: string, email: string, password: string, phone?: string, role?: 'user' | 'owner') => {
     setIsLoading(true);
     setError(null);
     
     try {
-      const response = await api.register({ name, email, password, phone });
+      const response = await api.register({ name, email, password, phone, role });
       
       if (response.success && response.data) {
         setUser(response.data.user);

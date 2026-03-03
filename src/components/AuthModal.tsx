@@ -27,7 +27,6 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
   const { login, register } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = location.state?.from || location.pathname;
 
   if (!isOpen) return null;
 
@@ -47,8 +46,8 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
       setError('Password is required');
       return false;
     }
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (formData.password.length < 8) {
+      setError('Password must be at least 8 characters');
       return false;
     }
 
@@ -83,47 +82,27 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
     setError(null);
 
     try {
-      let success = false;
-      
       if (mode === 'login') {
-        success = await login(formData.email, formData.password);
+        await login(formData.email, formData.password);
       } else {
-        success = await register(formData.name, formData.email, formData.phone, formData.password);
+        await register(formData.name, formData.email, formData.password, formData.phone);
       }
 
-      if (success) {
-        toast.success(mode === 'login' ? 'Login successful!' : 'Registration successful!');
-        onClose();
-        if (onSuccess) onSuccess();
-        // Redirect to previous page
-        navigate(from, { replace: true });
-      }
-    } catch (error: any) {
+      toast.success(mode === 'login' ? 'Login successful!' : 'Registration successful!');
+      onClose();
+      if (onSuccess) onSuccess();
+    } catch (error: unknown) {
       console.error('Auth error:', error);
-      setError(error.message || 'Authentication failed. Please try again.');
-      toast.error(error.message || 'Authentication failed');
+      const message = error instanceof Error ? error.message : 'Authentication failed. Please try again.';
+      setError(message);
     } finally {
       setLoading(false);
     }
   };
 
-  const fillDemoCredentials = (type: 'admin' | 'user') => {
-    if (type === 'admin') {
-      setFormData({
-        ...formData,
-        email: 'admin@pgfinder.com',
-        password: 'Admin@9876#Secure',
-        confirmPassword: '',
-      });
-    } else {
-      setFormData({
-        ...formData,
-        email: 'user@test.com',
-        password: 'password123',
-        confirmPassword: '',
-      });
-    }
-    setError(null);
+  const goToLoginPage = () => {
+    onClose();
+    navigate('/login', { state: { from: location.pathname } });
   };
 
   return (
@@ -307,30 +286,14 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
             </button>
           </p>
 
-          {/* Demo Credentials */}
-          {mode === 'login' && (
-            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-              <p className="text-xs text-gray-500 text-center mb-2">Demo Credentials</p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => fillDemoCredentials('admin')}
-                  className="p-2 bg-white rounded border hover:bg-orange-50 transition-colors text-xs"
-                >
-                  <p className="font-medium text-gray-900">Admin</p>
-                  <p className="text-gray-500 truncate">admin@pgfinder.com</p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fillDemoCredentials('user')}
-                  className="p-2 bg-white rounded border hover:bg-orange-50 transition-colors text-xs"
-                >
-                  <p className="font-medium text-gray-900">Test User</p>
-                  <p className="text-gray-500 truncate">user@test.com</p>
-                </button>
-              </div>
-            </div>
-          )}
+          <div className="mt-3 text-center">
+            <button
+              onClick={goToLoginPage}
+              className="text-sm text-gray-400 hover:text-orange-600 transition-colors"
+            >
+              Go to full login page →
+            </button>
+          </div>
         </div>
       </div>
     </div>

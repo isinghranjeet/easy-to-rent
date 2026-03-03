@@ -33,7 +33,7 @@ export function Hero() {
   ];
 
   return (
-    <section className="relative min-h-[85vh] flex items-center overflow-hidden">
+    <section className="relative w-full min-h-[85vh] flex items-center overflow-hidden">
       {/* Background Pattern - EXACTLY LIKE SCREENSHOT */}
       <div className="absolute inset-0 hero-gradient opacity-95" />
       <div 
@@ -110,10 +110,12 @@ Perfect for students seeking comfort, security, and convenience near Chandigarh 
             </div>
 
             {/* Orange Button */}
-            <Button onClick={handleSearch} size="xl" className="w-full md:w-auto mt-4 bg-orange-500 hover:bg-orange-600 text-white">
-              <Search className="h-5 w-5 mr-2" />
-              Search PGs
-            </Button>
+            <div className="mt-4 flex items-end">
+              <Button onClick={handleSearch} size="xl" className="w-full h-12 bg-orange-500 hover:bg-orange-600 text-white">
+                <Search className="h-5 w-5 mr-2" />
+                Search
+              </Button>
+            </div>
           </div>
 
           {/* Stats - Light Sky Blue Text */}

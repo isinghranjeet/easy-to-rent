@@ -95,7 +95,8 @@ export function Footer() {
       id: chatMessages.length + 1,
       text: userMessage,
       isAgent: false,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      agentName: "You"
     };
     
     setChatMessages(prev => [...prev, newUserMessage]);
@@ -271,9 +272,9 @@ export function Footer() {
         .chat-window {
           position: fixed;
           bottom: 90px;
-          right: 20px;
-          width: 380px;
-          max-width: 90vw;
+          right: 16px;
+          width: calc(100vw - 32px);
+          max-width: 380px;
           background: white;
           border-radius: 16px;
           box-shadow: 0 20px 60px rgba(249, 115, 22, 0.25);
@@ -784,7 +785,7 @@ export function Footer() {
         </div>
 
         {/* ENHANCED LIVE CHAT SUPPORT */}
-        <div className="fixed bottom-6 right-6 z-50" style={{ position: 'relative' }}>
+        <div className="fixed bottom-6 right-6 z-50">
           <button 
             onClick={handleLiveChat}
             className="group flex items-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 px-5 py-3 font-medium text-white shadow-lg transition-all hover:scale-105 hover:from-orange-600 hover:to-orange-700 hover:shadow-xl hover:shadow-orange-500/30"
@@ -912,7 +913,7 @@ export function Footer() {
                     }}
                     placeholder="Type your message here... (Press Enter to send)"
                     className="chat-input"
-                    rows="2"
+                    rows={2}
                   />
                   <button 
                     onClick={handleSendMessage}

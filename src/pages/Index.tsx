@@ -8,7 +8,7 @@ import { CTASection } from '../components/home/CTASection';
 
 const Index = () => {
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen w-full overflow-x-hidden flex flex-col">
       <Navbar />
       <main className="flex-1">
         <Hero />
