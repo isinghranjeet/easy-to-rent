@@ -1,11 +1,8 @@
-// /src/components/home/FeaturedPGs.tsx
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Star, AlertCircle, Heart, GitCompare } from 'lucide-react';
+import { ArrowRight, Star, AlertCircle, Wifi } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PGCard } from '@/components/pg/PGCard';
-import { useWishlist } from '@/contexts/WishlistContext';
-import { useCompare } from '@/contexts/CompareContext';
 
 const API_URL = 'https://eassy-to-rent-backend.onrender.com';
 
@@ -30,14 +27,12 @@ interface PGListing {
   reviewCount: number;
   ownerName?: string;
   ownerPhone?: string;
-  contactPhone?: string;
   wifi?: boolean;
   meals?: boolean;
   ac?: boolean;
   parking?: boolean;
   createdAt: string;
   distance?: string;
-  published?: boolean;
 }
 
 export function FeaturedPGs() {
@@ -45,8 +40,6 @@ export function FeaturedPGs() {
   const [displayedPGs, setDisplayedPGs] = useState<PGListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const { wishlist, addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
-  const { compareList, addToCompare, removeFromCompare, isInCompare } = useCompare();
   const itemsPerPage = 6;
 
   useEffect(() => {
@@ -58,9 +51,9 @@ export function FeaturedPGs() {
       setLoading(true);
       setError('');
       
-      console.log('🌐 Fetching PGs from:', `${API_URL}/api/pg`);
+      console.log('🌐 Fetching PGs from:', `${API_URL}/api/pg?limit=20`);
       
-      const response = await fetch(`${API_URL}/api/pg`, {
+      const response = await fetch(`${API_URL}/api/pg?limit=20`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -76,40 +69,38 @@ export function FeaturedPGs() {
       const result = await response.json();
       console.log('📥 Response received:', result);
       
-      // Handle the backend response structure
-      // Based on your backend: { success: true, data: { items: [...], total, page, pages } }
+      // Handle different response structures
       let pgs: PGListing[] = [];
       
       if (result.success) {
-        // Case: { success: true, data: { items: [...] } }
+        // Case 1: { success: true, data: { items: [...] } }
         if (result.data?.items && Array.isArray(result.data.items)) {
           pgs = result.data.items;
-          console.log(`✅ Found ${pgs.length} PGs from backend`);
+          console.log(`✅ Found ${pgs.length} PGs from backend (paginated)`);
           console.log(`📊 Total: ${result.data.total}, Page: ${result.data.page}/${result.data.pages}`);
         }
-        // Case: { success: true, data: [...] } (direct array)
+        // Case 2: { success: true, data: [...] }
         else if (Array.isArray(result.data)) {
           pgs = result.data;
           console.log(`✅ Found ${pgs.length} PGs from backend (direct array)`);
         }
-        // Case: { success: true, items: [...] }
+        // Case 3: { success: true, items: [...] }
         else if (Array.isArray(result.items)) {
           pgs = result.items;
           console.log(`✅ Found ${pgs.length} PGs from backend (items array)`);
         }
         else {
           console.warn('Unexpected data structure:', result);
-          pgs = [];
         }
       } else {
         throw new Error(result.message || 'Failed to fetch PGs');
       }
       
-      // Filter to only show published PGs (backend should already do this for public endpoint)
+      // Filter to only show published PGs
       const publishedPGs = pgs.filter(pg => pg.published !== false);
       
       if (publishedPGs.length === 0) {
-        setError('No published PGs found');
+        setError('No published PGs found in database');
         setAllPGs([]);
         setDisplayedPGs([]);
         return;
@@ -150,35 +141,8 @@ export function FeaturedPGs() {
     return allPGs.filter(pg => pg.type === type).length;
   };
 
-  // Helper function to transform PG data for PGCard - FIXED: No duplicate amenities
+  // Helper function to transform PG data for PGCard
   const transformForPGCard = (pg: PGListing) => {
-    // Create a clean amenities array without duplicates
-    const amenitiesSet = new Set<string>();
-    
-    // Add all amenities from the amenities array
-    if (pg.amenities && Array.isArray(pg.amenities)) {
-      pg.amenities.forEach(amenity => {
-        if (amenity) amenitiesSet.add(amenity);
-      });
-    }
-    
-    // Add boolean amenities only if they're not already represented
-    if (pg.wifi && !Array.from(amenitiesSet).some(a => a.toLowerCase().includes('wifi'))) {
-      amenitiesSet.add('WiFi');
-    }
-    if (pg.ac && !Array.from(amenitiesSet).some(a => a.toLowerCase().includes('ac') || a.toLowerCase().includes('air conditioning'))) {
-      amenitiesSet.add('AC');
-    }
-    if (pg.meals && !Array.from(amenitiesSet).some(a => a.toLowerCase().includes('meal') || a.toLowerCase().includes('food'))) {
-      amenitiesSet.add('Meals');
-    }
-    if (pg.parking && !Array.from(amenitiesSet).some(a => a.toLowerCase().includes('park'))) {
-      amenitiesSet.add('Parking');
-    }
-    
-    // Convert Set back to array
-    const cleanAmenities = Array.from(amenitiesSet);
-    
     return {
       id: pg._id || pg.id || '',
       name: pg.name,
@@ -190,33 +154,19 @@ export function FeaturedPGs() {
       city: pg.city,
       locality: pg.locality,
       type: pg.type,
-      amenities: cleanAmenities, // Use deduplicated amenities
+      amenities: pg.amenities || [],
       rating: pg.rating || 0,
       reviewCount: pg.reviewCount || 0,
       ownerName: pg.ownerName,
-      ownerPhone: pg.ownerPhone || pg.contactPhone,
+      ownerPhone: pg.ownerPhone,
       featured: pg.featured || false,
       verified: pg.verified || false,
+      wifi: pg.wifi || pg.amenities?.some(a => a.toLowerCase().includes('wifi')) || false,
+      meals: pg.meals || pg.amenities?.some(a => a.toLowerCase().includes('meal')) || false,
+      ac: pg.ac || pg.amenities?.some(a => a.toLowerCase().includes('ac') || a.toLowerCase().includes('air')) || false,
+      parking: pg.parking || pg.amenities?.some(a => a.toLowerCase().includes('park')) || false,
       distance: pg.distance,
     };
-  };
-
-  const handleWishlistToggle = (pg: PGListing) => {
-    const pgId = pg._id || pg.id || '';
-    if (isInWishlist(pgId)) {
-      removeFromWishlist(pgId);
-    } else {
-      addToWishlist(transformForPGCard(pg));
-    }
-  };
-
-  const handleCompareToggle = (pg: PGListing) => {
-    const pgId = pg._id || pg.id || '';
-    if (isInCompare(pgId)) {
-      removeFromCompare(pgId);
-    } else {
-      addToCompare(transformForPGCard(pg));
-    }
   };
 
   if (loading) {
@@ -301,38 +251,6 @@ export function FeaturedPGs() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
-            {/* Wishlist Button */}
-            <Link to="/wishlist">
-              <Button 
-                variant="outline" 
-                className="flex items-center gap-2 border-orange-200 text-orange-600 hover:bg-orange-50"
-              >
-                <Heart className={`h-4 w-4 ${wishlist.length > 0 ? 'fill-orange-500' : ''}`} />
-                <span>Wishlist</span>
-                {wishlist.length > 0 && (
-                  <span className="ml-1 bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full text-xs font-bold">
-                    {wishlist.length}
-                  </span>
-                )}
-              </Button>
-            </Link>
-            
-            {/* Compare Button */}
-            <Link to="/compare">
-              <Button 
-                variant="outline" 
-                className="flex items-center gap-2 border-orange-200 text-orange-600 hover:bg-orange-50"
-              >
-                <GitCompare className="h-4 w-4" />
-                <span>Compare</span>
-                {compareList.length > 0 && (
-                  <span className="ml-1 bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full text-xs font-bold">
-                    {compareList.length}
-                  </span>
-                )}
-              </Button>
-            </Link>
-            
             <Link to="/pg">
               <Button className="bg-orange-600 hover:bg-orange-700 gap-2">
                 View All PGs
@@ -355,47 +273,19 @@ export function FeaturedPGs() {
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {displayedPGs.map((pg, index) => {
-                const pgId = pg._id || pg.id || '';
-                const transformedPg = transformForPGCard(pg);
-                
-                return (
-                  <div key={pgId || index} className="relative group">
-                    {pg.featured && (
-                      <div className="absolute top-3 left-3 z-10">
-                        <div className="inline-flex items-center gap-1 px-3 py-1 bg-orange-500 text-white text-xs font-semibold rounded-full shadow-sm">
-                          <Star className="h-3 w-3 fill-white" />
-                          Featured
-                        </div>
+              {displayedPGs.map((pg, index) => (
+                <div key={pg._id || pg.id || index} className="relative">
+                  {pg.featured && (
+                    <div className="absolute top-3 left-3 z-10">
+                      <div className="inline-flex items-center gap-1 px-3 py-1 bg-orange-500 text-white text-xs font-semibold rounded-full shadow-sm">
+                        <Star className="h-3 w-3 fill-white" />
+                        Featured
                       </div>
-                    )}
-                    
-                    {/* Wishlist Button Overlay */}
-                    <button
-                      onClick={() => handleWishlistToggle(pg)}
-                      className="absolute top-3 right-3 z-20 p-2 bg-white rounded-full shadow-md hover:shadow-lg transition-all opacity-0 group-hover:opacity-100"
-                      title={isInWishlist(pgId) ? "Remove from wishlist" : "Add to wishlist"}
-                    >
-                      <Heart 
-                        className={`h-5 w-5 ${isInWishlist(pgId) ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} 
-                      />
-                    </button>
-
-                    {/* Compare Button Overlay */}
-                    <button
-                      onClick={() => handleCompareToggle(pg)}
-                      className="absolute top-3 right-14 z-20 p-2 bg-white rounded-full shadow-md hover:shadow-lg transition-all opacity-0 group-hover:opacity-100"
-                      title={isInCompare(pgId) ? "Remove from compare" : "Add to compare"}
-                    >
-                      <GitCompare 
-                        className={`h-5 w-5 ${isInCompare(pgId) ? 'text-orange-600' : 'text-gray-600'}`} 
-                      />
-                    </button>
-
-                    <PGCard pg={transformedPg} index={index} />
-                  </div>
-                );
-              })}
+                    </div>
+                  )}
+                  <PGCard pg={transformForPGCard(pg)} index={index} />
+                </div>
+              ))}
             </div>
 
             <div className="mt-12 pt-8 border-t border-gray-200">
@@ -411,17 +301,17 @@ export function FeaturedPGs() {
                 <div className="flex flex-wrap gap-2 justify-center">
                   <Link to="/pg?type=boys">
                     <Button variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-50">
-                      👨 Boys PG ({countByType('boys')})
+                       Boys PG ({countByType('boys')})
                     </Button>
                   </Link>
                   <Link to="/pg?type=girls">
                     <Button variant="outline" className="border-pink-300 text-pink-700 hover:bg-pink-50">
-                      👩 Girls PG ({countByType('girls')})
+                       Girls PG ({countByType('girls')})
                     </Button>
                   </Link>
                   <Link to="/pg?type=co-ed">
                     <Button variant="outline" className="border-purple-300 text-purple-700 hover:bg-purple-50">
-                      👥 Co-ed PG ({countByType('co-ed')})
+                       Co-ed PG ({countByType('co-ed')})
                     </Button>
                   </Link>
                 </div>
