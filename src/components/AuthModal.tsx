@@ -23,6 +23,8 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
     password: '',
     confirmPassword: '',
   });
+  const [showOtpScreen, setShowOtpScreen] = useState(false);
+  const [otpValue, setOtpValue] = useState('');
   
   const { login, register } = useAuth();
   const navigate = useNavigate();
@@ -92,8 +94,42 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
       onClose();
       if (onSuccess) onSuccess();
     } catch (error: unknown) {
+      // Check if OTP is required
+      if (error instanceof Error && error.message === 'OTP_REQUIRED') {
+        setShowOtpScreen(true);
+        setError(null);
+        toast.success('OTP sent!', { description: 'Check your email for the verification code.' });
+        return;
+      }
       console.error('Auth error:', error);
       const message = error instanceof Error ? error.message : 'Authentication failed. Please try again.';
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { api } = await import('@/services/api');
+      const response = await api.verifyLoginOtp(formData.email, otpValue);
+
+      if (response.success && response.data) {
+        toast.success('Login successful!');
+        setShowOtpScreen(false);
+        setOtpValue('');
+        onClose();
+        if (onSuccess) onSuccess();
+        window.location.reload();
+      } else {
+        throw new Error('Verification failed');
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to verify OTP';
       setError(message);
     } finally {
       setLoading(false);
@@ -104,6 +140,8 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
     onClose();
     navigate('/login', { state: { from: location.pathname } });
   };
+
+
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
@@ -128,6 +166,79 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
           </p>
         </div>
 
+        {/* OTP Screen or Form */}
+        {showOtpScreen ? (
+          <div className="p-6 space-y-4">
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 mx-auto rounded-full bg-orange-100 flex items-center justify-center">
+                <Mail className="h-7 w-7 text-orange-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Verify your email</h3>
+              <p className="text-sm text-gray-500">
+                We sent a 6-digit OTP to <strong>{formData.email}</strong>
+              </p>
+            </div>
+
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-red-600 text-sm">
+                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleVerifyOtp} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Enter OTP</label>
+                <input
+                  type="text"
+                  value={otpValue}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '');
+                    setOtpValue(val);
+                    if (error) setError(null);
+                  }}
+                  className="w-full py-4 text-center text-3xl tracking-[0.5em] font-mono border border-gray-300 rounded-xl text-gray-900 placeholder:text-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
+                  placeholder="000000"
+                  maxLength={6}
+                  required
+                  disabled={loading}
+                  autoFocus
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading || otpValue.length < 6}
+                className="w-full py-3 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-xl font-semibold shadow-lg hover:from-orange-700 hover:to-amber-700 hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  'Verify OTP'
+                )}
+              </button>
+            </form>
+
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowOtpScreen(false);
+                  setOtpValue('');
+                  setError(null);
+                }}
+                className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                disabled={loading}
+              >
+                ← Back to login
+              </button>
+            </div>
+          </div>
+        ) : (
+        <>
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && (
@@ -221,6 +332,8 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
             </div>
           </div>
 
+
+
           {mode === 'register' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -263,6 +376,8 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
             )}
           </button>
         </form>
+        </>
+        )}
 
         {/* Footer */}
         <div className="p-6 pt-0 border-t mt-4">

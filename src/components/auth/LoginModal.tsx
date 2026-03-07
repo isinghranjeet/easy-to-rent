@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/components/auth/LoginModal.tsx
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -41,6 +42,9 @@ const LoginModal: React.FC<LoginModalProps> = ({
     email: '',
     password: ''
   });
+
+  const [showOtpScreen, setShowOtpScreen] = useState(false);
+  const [otpValue, setOtpValue] = useState('');
 
   // Register form state
   const [registerData, setRegisterData] = useState({
@@ -111,76 +115,65 @@ const LoginModal: React.FC<LoginModalProps> = ({
     return Object.keys(errors).length === 0;
   };
 
-  // CORRECTED LOGIN FUNCTION - Using the exact endpoint from your backend
+  // Login through AuthContext — which uses api.login()
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
     
     try {
-      console.log('Attempting login with:', loginData.email);
+      await authLogin(loginData.email, loginData.password);
       
-      // Your backend is running on Render
-      const API_URL = 'https://eassy-to-rent-backend.onrender.com';
-      
-      // Based on your backend code, the correct endpoint is /api/auth/login
-      const response = await fetch(`${API_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          email: loginData.email,
-          password: loginData.password
-        }),
-      });
-
-      const data = await response.json();
-      console.log('Login response:', data);
-
-      // Check if login was successful based on your backend response structure
-      if (response.ok && data.success) {
-        // Extract user data from the response
-        // Based on your database, the user data should be in data.data or data.user
-        const userData = data.data || data.user;
-        
-        if (userData && data.token) {
-          // Store token and user data
-          localStorage.setItem('auth_token', data.token);
-          localStorage.setItem('user', JSON.stringify({
-            id: userData._id || userData.id,
-            name: userData.name,
-            email: userData.email,
-            role: userData.role,
-            phone: userData.phone
-          }));
-          
-          // Call auth context login
-          if (authLogin) {
-            await authLogin(data.token, userData);
-          }
-          
-          toast.success('Login successful!', {
-            description: `Welcome back, ${userData.name || 'User'}!`,
-          });
-          
-          onClose();
-          setLoginData({ email: '', password: '' });
-        } else {
-          throw new Error('Invalid response structure');
-        }
-      } else {
-        // Handle error response
-        throw new Error(data.message || data.error || 'Login failed');
-      }
-      
+      // If we reach here, login was successful (no OTP needed — shouldn't happen now)
+      onClose();
+      setLoginData({ email: '', password: '' });
     } catch (error: any) {
+      // Check if OTP is required
+      if (error.message === 'OTP_REQUIRED') {
+        setShowOtpScreen(true);
+        toast.success('OTP sent!', { description: 'Check your email for the verification code.' });
+        return;
+      }
+
       console.error('Login error:', error);
       setError(error.message || 'Login failed. Please check your credentials.');
       toast.error('Login failed', {
         description: error.message || 'Please check your email and password'
       });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { api } = await import('@/services/api');
+      const response = await api.verifyLoginOtp(loginData.email, otpValue);
+
+      if (response.success && response.data) {
+        // The api.verifyLoginOtp already stores the token
+        // Reload user via page refresh to pick up the session
+        toast.success('Login successful!', {
+          description: `Welcome back, ${response.data.user?.name || 'User'}!`,
+        });
+        setShowOtpScreen(false);
+        setOtpValue('');
+        onClose();
+        setLoginData({ email: '', password: '' });
+        // Force reload to pick up the new auth state
+        window.location.reload();
+      } else {
+        throw new Error('Verification failed');
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to verify OTP';
+      console.error('Verify OTP error:', error);
+      setError(message);
+      toast.error('Verification failed', { description: message });
     } finally {
       setIsLoading(false);
     }
@@ -198,7 +191,7 @@ const LoginModal: React.FC<LoginModalProps> = ({
     setError(null);
     
     try {
-      const API_URL = 'https://eassy-to-rent-backend.onrender.com';
+      const API_URL = 'http://localhost:10000';
       
       const response = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
@@ -325,7 +318,71 @@ const LoginModal: React.FC<LoginModalProps> = ({
           </p>
         </div>
 
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'login' | 'register')}>
+        {showOtpScreen ? (
+          <div className="space-y-4">
+            <div className="text-center space-y-2">
+              <Mail className="h-10 w-10 text-primary mx-auto mb-2" />
+              <h3 className="text-lg font-medium">Verify your email</h3>
+              <p className="text-sm text-gray-500">
+                We've sent a 6-digit OTP to <strong>{loginData.email}</strong>.
+              </p>
+            </div>
+            
+            <form onSubmit={handleVerifyOtp} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="otp">Enter OTP</Label>
+                <Input
+                  id="otp"
+                  type="text"
+                  placeholder="------"
+                  value={otpValue}
+                  onChange={(e) => {
+                    setOtpValue(e.target.value);
+                    if (error) setError(null);
+                  }}
+                  className="text-center text-2xl tracking-widest uppercase font-mono h-14"
+                  maxLength={6}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <Button type="submit" className="w-full h-12 text-lg" disabled={isLoading || otpValue.length < 6}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                    Verifying...
+                  </>
+                ) : (
+                  'Verify OTP'
+                )}
+              </Button>
+              
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowOtpScreen(false);
+                    setOtpValue('');
+                    setError(null);
+                  }}
+                  className="text-sm text-gray-500 hover:text-gray-700"
+                  disabled={isLoading}
+                >
+                  Back to login
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : (
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'login' | 'register')}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="login">Login</TabsTrigger>
             <TabsTrigger value="register">Register</TabsTrigger>
@@ -555,6 +612,7 @@ const LoginModal: React.FC<LoginModalProps> = ({
             </form>
           </TabsContent>
         </Tabs>
+        )}
 
         <div className="text-xs text-center text-gray-400 mt-4">
           By continuing, you agree to our Terms of Service and Privacy Policy

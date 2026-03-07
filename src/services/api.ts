@@ -140,10 +140,41 @@ export class ApiService {
    * POST /api/auth/login
    * Backend response: { success, message, data: { _id, name, email, role, phone, token, lastLogin } }
    */
-  async login(credentials: LoginCredentials): Promise<ApiResponse<{ user: User; token: string }>> {
+  async login(credentials: LoginCredentials): Promise<ApiResponse<any>> {
     const response = await this.request<ApiResponse<any>>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
+    });
+
+    if (response.success && response.data) {
+      // If OTP is required, return the response without storing token
+      if (response.data.requireOtp) {
+        return {
+          success: true,
+          message: response.message,
+          data: { requireOtp: true, email: response.data.email },
+        };
+      }
+
+      const { token, ...userData } = response.data;
+      this.setToken(token);
+      return {
+        success: true,
+        message: response.message,
+        data: {
+          token,
+          user: userData as User,
+        },
+      };
+    }
+
+    throw new Error(response.message || 'Login failed');
+  }
+
+  async verifyLoginOtp(email: string, otp: string): Promise<ApiResponse<{ user: User; token: string }>> {
+    const response = await this.request<ApiResponse<any>>('/api/auth/verify-login-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp }),
     });
 
     if (response.success && response.data) {
@@ -159,7 +190,21 @@ export class ApiService {
       };
     }
 
-    throw new Error(response.message || 'Login failed');
+    throw new Error(response.message || 'OTP verification failed');
+  }
+
+  async forgotPassword(email: string): Promise<ApiResponse<{ email: string }>> {
+    return this.request<ApiResponse<{ email: string }>>('/api/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async resetPassword(email: string, otp: string, newPassword: string): Promise<ApiResponse<{ email: string }>> {
+    return this.request<ApiResponse<{ email: string }>>('/api/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp, newPassword }),
+    });
   }
 
   /**

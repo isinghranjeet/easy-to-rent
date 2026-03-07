@@ -66,6 +66,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await api.login({ email, password });
       
       if (response.success && response.data) {
+        // If OTP is required, throw a special error for the UI to catch
+        if (response.data.requireOtp) {
+          const otpError = new Error('OTP_REQUIRED');
+          (otpError as any).requireOtp = true;
+          (otpError as any).email = response.data.email;
+          throw otpError;
+        }
+
         setUser(response.data.user);
         toast.success('Login successful!', {
           description: `Welcome back, ${response.data.user.name}!`,
@@ -74,6 +82,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error(response.message || 'Login failed');
       }
     } catch (error: any) {
+      // Re-throw OTP_REQUIRED so the modal can handle it
+      if (error.message === 'OTP_REQUIRED') {
+        throw error;
+      }
       const errorMessage = error.message || 'Login failed. Please try again.';
       setError(errorMessage);
       toast.error('Login failed', { description: errorMessage });
