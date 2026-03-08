@@ -414,17 +414,7 @@ export function FeaturedPGs() {
       setError('');
       setDebugInfo(null);
       
-      console.log('🌐 Fetching PGs from Render:', `${API_URL}/api/pg?limit=20`);
-      
-      // First, check health endpoint
-      try {
-        const healthCheck = await fetch(`${API_URL}/health`);
-        const healthData = await healthCheck.json();
-        console.log('✅ Health check:', healthData);
-        setDebugInfo((prev: any) => ({ ...prev, health: healthData }));
-      } catch (healthError) {
-        console.warn('Health check failed:', healthError);
-      }
+      console.log('🌐 Fetching PGs from:', `${API_URL}/api/pg?limit=20`);
       
       const response = await fetch(`${API_URL}/api/pg?limit=20`, {
         method: 'GET',
@@ -432,68 +422,57 @@ export function FeaturedPGs() {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        mode: 'cors'
+        mode: 'cors',
+        cache: 'no-cache' // Add this to prevent caching
       });
       
       console.log('📥 Response status:', response.status);
-      console.log('📥 Response headers:', Object.fromEntries(response.headers.entries()));
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       
       const result = await response.json();
-      console.log('📥 Full response data:', result);
-      setDebugInfo((prev: any) => ({ ...prev, apiResponse: result }));
+      console.log('📥 Full response:', result);
+      setDebugInfo(result);
       
-      // Handle different response structures
+      // Handle the response structure we just saw
       let pgs: PGListing[] = [];
       
-      if (result.success) {
-        if (result.data?.items && Array.isArray(result.data.items)) {
+      if (result.success && result.data) {
+        if (result.data.items && Array.isArray(result.data.items)) {
           pgs = result.data.items;
-          console.log(`✅ Found ${pgs.length} PGs (paginated format)`);
+          console.log(`✅ Found ${pgs.length} PGs from backend`);
         } else if (Array.isArray(result.data)) {
           pgs = result.data;
-          console.log(`✅ Found ${pgs.length} PGs (direct array format)`);
-        } else if (Array.isArray(result.items)) {
-          pgs = result.items;
-          console.log(`✅ Found ${pgs.length} PGs (items array format)`);
-        } else {
-          console.warn('Unexpected data structure:', result);
-          setDebugInfo((prev: any) => ({ 
-            ...prev, 
-            warning: 'Unexpected data structure', 
-            structure: result 
-          }));
+          console.log(`✅ Found ${pgs.length} PGs from backend`);
         }
-      } else {
-        console.warn('API returned success: false', result);
-        setDebugInfo((prev: any) => ({ ...prev, apiError: result }));
       }
       
-      // Filter to only show published PGs
-      const publishedPGs = pgs.filter(pg => pg.published !== false);
-      console.log(`📊 Published PGs: ${publishedPGs.length} out of ${pgs.length} total`);
-      
-      if (publishedPGs.length === 0) {
-        if (pgs.length > 0) {
-          setError(`${pgs.length} PGs found but all are unpublished`);
-        } else {
-          setError('No PGs found in database');
-        }
+      if (pgs.length === 0) {
+        setError('No PGs found in database');
         setAllPGs([]);
         setDisplayedPGs([]);
         return;
       }
       
-      setAllPGs(publishedPGs);
-      updateDisplayedPGs(publishedPGs);
+      // Log each PG to see what we have
+      pgs.forEach((pg, index) => {
+        console.log(`📋 PG ${index + 1}:`, {
+          name: pg.name,
+          published: pg.published,
+          featured: pg.featured,
+          price: pg.price,
+          city: pg.city
+        });
+      });
+      
+      setAllPGs(pgs);
+      updateDisplayedPGs(pgs);
       
     } catch (err: any) {
       console.error('❌ Fetch error:', err);
       setError(`Failed to load data: ${err.message}`);
-      setDebugInfo((prev: any) => ({ ...prev, fetchError: err.toString() }));
     } finally {
       setLoading(false);
     }
@@ -576,7 +555,6 @@ export function FeaturedPGs() {
             <h3 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Data</h3>
             <p className="text-gray-600 mb-4">{error}</p>
             
-            {/* Debug info - remove in production */}
             {debugInfo && (
               <div className="max-w-2xl mx-auto mt-4 p-4 bg-gray-50 rounded-lg text-left">
                 <p className="font-mono text-sm text-gray-600 mb-2">Debug Info:</p>
@@ -589,10 +567,6 @@ export function FeaturedPGs() {
             <Button onClick={fetchPGs} className="bg-orange-600 hover:bg-orange-700 mt-4">
               Try Again
             </Button>
-            
-            <p className="text-sm text-gray-500 mt-4">
-              API Status: <a href={`${API_URL}/health`} target="_blank" rel="noopener noreferrer" className="text-orange-600 hover:underline">Check Health</a>
-            </p>
           </div>
         </div>
       </section>
