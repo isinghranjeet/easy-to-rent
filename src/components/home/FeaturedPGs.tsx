@@ -401,6 +401,7 @@ export function FeaturedPGs() {
   const [displayedPGs, setDisplayedPGs] = useState<PGListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [retryCount, setRetryCount] = useState(0);
   const itemsPerPage = 6;
   const { compareList } = useCompare();
   
@@ -415,6 +416,32 @@ export function FeaturedPGs() {
       setError('');
       
       console.log('🌐 Fetching PGs from Render:', `${API_URL}/api/pg?limit=20`);
+      console.log('🔍 Checking if Render backend is accessible...');
+      
+      // First, check if the backend is alive
+      try {
+        const healthCheck = await fetch(`${API_URL}/health`, {
+          method: 'GET',
+          mode: 'cors',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        if (healthCheck.ok) {
+          const healthData = await healthCheck.json();
+          console.log('✅ Health check passed:', healthData);
+        } else {
+          console.warn('⚠️ Health check failed with status:', healthCheck.status);
+        }
+      } catch (healthError) {
+        console.warn('⚠️ Health check failed:', healthError);
+        // Continue anyway, try the main endpoint
+      }
+      
+      // Add a timeout to the fetch
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
       const response = await fetch(`${API_URL}/api/pg?limit=20`, {
         method: 'GET',
@@ -423,8 +450,8 @@ export function FeaturedPGs() {
           'Accept': 'application/json'
         },
         mode: 'cors',
-        credentials: 'include' // Add this if you're using cookies/sessions
-      });
+        signal: controller.signal
+      }).finally(() => clearTimeout(timeoutId));
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -472,10 +499,32 @@ export function FeaturedPGs() {
       
       setAllPGs(publishedPGs);
       updateDisplayedPGs(publishedPGs);
+      setRetryCount(0); // Reset retry count on success
       
     } catch (err: any) {
       console.error('❌ Fetch error:', err);
-      setError(`Failed to load data: ${err.message}`);
+      
+      // More specific error messages
+      let errorMessage = 'Failed to load data';
+      
+      if (err.name === 'AbortError') {
+        errorMessage = 'Request timed out. Render backend might be waking up (takes 30-60 seconds on free tier)';
+      } else if (err.message.includes('Failed to fetch')) {
+        errorMessage = 'Cannot connect to Render backend. The server might be sleeping or unavailable.';
+      } else {
+        errorMessage = `Error: ${err.message}`;
+      }
+      
+      setError(errorMessage);
+      
+      // Auto-retry logic for Render free tier (which sleeps after inactivity)
+      if (retryCount < 3) {
+        setTimeout(() => {
+          console.log(`🔄 Retry attempt ${retryCount + 1}/3...`);
+          setRetryCount(prev => prev + 1);
+          fetchPGs();
+        }, 5000); // Retry after 5 seconds
+      }
     } finally {
       setLoading(false);
     }
@@ -557,6 +606,11 @@ export function FeaturedPGs() {
               </div>
             ))}
           </div>
+          {retryCount > 0 && (
+            <div className="text-center mt-4 text-orange-600">
+              Retrying... Attempt {retryCount}/3
+            </div>
+          )}
         </div>
       </section>
     );
@@ -574,12 +628,25 @@ export function FeaturedPGs() {
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
               {error}
             </p>
-            <Button 
-              onClick={fetchPGs}
-              className="bg-orange-600 hover:bg-orange-700"
-            >
-              Try Again
-            </Button>
+            <div className="space-y-2">
+              <Button 
+                onClick={fetchPGs}
+                className="bg-orange-600 hover:bg-orange-700"
+              >
+                Try Again
+              </Button>
+              <p className="text-sm text-gray-500 mt-4">
+                If this persists, check if Render backend is running at:<br />
+                <a 
+                  href={`${API_URL}/health`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-orange-600 hover:underline"
+                >
+                  {API_URL}/health
+                </a>
+              </p>
+            </div>
           </div>
         </div>
       </section>
