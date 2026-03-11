@@ -233,13 +233,13 @@ export function FeaturedPGs() {
                 Top Picks
               </span>
             </div>
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-gray-900 mt-2">
+            {/* <h2 className="font-display text-3xl md:text-4xl font-bold text-gray-900 mt-2">
               Featured PG Accommodations
             </h2>
             <p className="text-gray-600 mt-3 max-w-2xl">
               {displayedPGs.length} premium stays loved by students for their comfort, location, and amenities. 
               All verified and highly rated by residents.
-            </p>
+            </p> */}
             <div className="flex items-center gap-2 mt-3 text-sm text-gray-500">
               <span className="inline-flex items-center gap-1">
                 <span className="h-2 w-2 rounded-full bg-orange-500"></span>

@@ -86,14 +86,7 @@ export function Navbar() {
                 </div>
               </div>
               
-              <div className="flex flex-col">
-                <span className="text-xl lg:text-2xl font-bold bg-gradient-to-r from-orange-600 to-orange-400 bg-clip-text text-transparent">
-                  EasyToRent
-                </span>
-                <span className="hidden sm:block text-sm text-gray-500 font-medium tracking-wide">
-                  Find • Stay • Live
-                </span>
-              </div>
+              
             </Link>
 
             {/* Desktop Navigation - Enhanced */}
