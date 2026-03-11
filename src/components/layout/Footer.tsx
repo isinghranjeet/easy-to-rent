@@ -93,6 +93,19 @@ export function Footer() {
     }
   };
 
+  // Prevent body scroll when chat is open
+  useEffect(() => {
+    if (showChat) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [showChat]);
+
   // Auto-scroll
   useEffect(() => {
     if (chatEndRef.current) {
@@ -366,18 +379,58 @@ export function Footer() {
           border-color: #f97316;
         }
         
-        /* Chat Window */
+        /* Fixed Chat Widget Styles - These won't affect layout */
+        .chat-widget-container {
+          position: fixed;
+          bottom: 0;
+          right: 0;
+          z-index: 9999;
+          pointer-events: none;
+        }
+        
+        .chat-widget-container > * {
+          pointer-events: auto;
+        }
+        
+        /* Live support button */
+        .live-support-btn {
+          background: #f97316;
+          border: none;
+          color: white;
+          padding: 14px 24px;
+          border-radius: 40px;
+          font-weight: 600;
+          font-size: 15px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          box-shadow: 0 10px 25px rgba(249, 115, 22, 0.4);
+          transition: all 0.3s ease;
+          cursor: pointer;
+          margin-right: 24px;
+          margin-bottom: 24px;
+        }
+        
+        .live-support-btn:hover {
+          background: #ea580c;
+          transform: translateY(-2px);
+        }
+        
+        /* Chat Window - Fixed positioning */
         .chat-window {
           position: fixed;
           bottom: 90px;
-          right: 20px;
+          right: 24px;
           width: 400px;
           background: #ffffff;
           border-radius: 16px;
           box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
-          z-index: 1000;
+          z-index: 10000;
           overflow: hidden;
           border: 1px solid #e2e8f0;
+          display: flex;
+          flex-direction: column;
+          max-height: 600px;
         }
         
         .chat-window.minimized {
@@ -391,13 +444,14 @@ export function Footer() {
           padding: 16px 20px;
           cursor: pointer;
           border-bottom: 2px solid #f97316;
+          flex-shrink: 0;
         }
         
         .chat-body {
           padding: 20px;
-          max-height: 450px;
           overflow-y: auto;
           background: #f8fafc;
+          flex: 1;
         }
         
         /* Message bubbles */
@@ -587,6 +641,7 @@ export function Footer() {
           background: white;
           border-top: 1px solid #e2e8f0;
           position: relative;
+          flex-shrink: 0;
         }
         
         .chat-input-container {
@@ -745,7 +800,7 @@ export function Footer() {
         .unread-badge {
           position: absolute;
           top: -8px;
-          right: -8px;
+          right: 16px;
           background: #ef4444;
           color: white;
           border-radius: 50%;
@@ -757,28 +812,6 @@ export function Footer() {
           font-size: 12px;
           font-weight: bold;
           border: 2px solid white;
-        }
-        
-        /* Live support button */
-        .live-support-btn {
-          background: #f97316;
-          border: none;
-          color: white;
-          padding: 14px 24px;
-          border-radius: 40px;
-          font-weight: 600;
-          font-size: 15px;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          box-shadow: 0 10px 25px rgba(249, 115, 22, 0.4);
-          transition: all 0.3s ease;
-          cursor: pointer;
-        }
-        
-        .live-support-btn:hover {
-          background: #ea580c;
-          transform: translateY(-2px);
         }
         
         /* Contact panel */
@@ -813,10 +846,10 @@ export function Footer() {
           color: #f97316;
         }
         
-        /* Settings menu - FIXED POSITIONING */
+        /* Settings menu */
         .settings-menu {
           position: absolute;
-          top: 50px;
+          bottom: 80px;
           right: 20px;
           background: white;
           border-radius: 12px;
@@ -1078,17 +1111,18 @@ export function Footer() {
             </div>
           </div>
         </div>
+      </footer>
 
+      {/* Chat Widget - Completely separated from footer and fixed positioned */}
+      <div className="chat-widget-container">
         {/* Live Chat Button */}
-        <div className="fixed bottom-6 right-6 z-50">
-          <button onClick={handleLiveChat} className="live-support-btn">
-            <MessageSquare className="h-5 w-5" />
-            <span>Live Support</span>
-          </button>
-          {unreadCount > 0 && (
-            <div className="unread-badge">{unreadCount}</div>
-          )}
-        </div>
+        <button onClick={handleLiveChat} className="live-support-btn">
+          <MessageSquare className="h-5 w-5" />
+          <span>Live Support</span>
+        </button>
+        {unreadCount > 0 && (
+          <div className="unread-badge">{unreadCount}</div>
+        )}
 
         {/* Chat Window */}
         {showChat && (
@@ -1218,7 +1252,7 @@ export function Footer() {
 
                 {/* Input Area */}
                 <div className="chat-input-area">
-                  {/* Settings Menu - FIXED POSITIONING */}
+                  {/* Settings Menu */}
                   {showSettings && (
                     <div className="settings-menu" ref={settingsRef}>
                       <div className="settings-item" onClick={() => setIsMuted(!isMuted)}>
@@ -1301,7 +1335,7 @@ export function Footer() {
             )}
           </div>
         )}
-      </footer>
+      </div>
     </>
   );
 }
