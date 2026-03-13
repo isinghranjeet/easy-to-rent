@@ -207,7 +207,7 @@ export function FeaturedPGs() {
               </span>
             </div>
             <h2 className="font-display text-3xl md:text-4xl font-bold text-gray-900 mt-2">
-              Featured PG Accommodations
+              Featured Accommodations
             </h2>
           </div>
 
