@@ -1,254 +1,151 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowRight, Star, AlertCircle } from 'lucide-react';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Search, MapPin, Home, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { PGCard } from '@/components/pg/PGCard';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { locations } from '@/lib/data/pgData';
 
-const API_URL = 'https://eassy-to-rent-backend.onrender.com';
+export function Hero() {
+  const navigate = useNavigate();
 
-interface PGListing {
-  _id: string;
-  id?: string;
-  name: string;
-  slug?: string;
-  description: string;
-  city: string;
-  locality: string;
-  address: string;
-  price: number;
-  type: 'boys' | 'girls' | 'co-ed' | 'family';
-  images: string[];
-  gallery?: string[];
-  amenities: string[];
-  verified: boolean;
-  featured: boolean;
-  rating: number;
-  reviewCount: number;
-  ownerName?: string;
-  ownerPhone?: string;
-  wifi?: boolean;
-  meals?: boolean;
-  ac?: boolean;
-  parking?: boolean;
-  createdAt: string;
-  distance?: string;
-  published?: boolean;
-}
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedLocation, setSelectedLocation] = useState('');
+  const [selectedType, setSelectedType] = useState('');
 
-export function FeaturedPGs() {
-  const [allPGs, setAllPGs] = useState<PGListing[]>([]);
-  const [displayedPGs, setDisplayedPGs] = useState<PGListing[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const itemsPerPage = 6;
+  const handleSearch = () => {
+    const params = new URLSearchParams();
 
-  useEffect(() => {
-    fetchPGs();
-  }, []);
+    if (searchQuery) params.set('q', searchQuery);
+    if (selectedLocation) params.set('location', selectedLocation);
+    if (selectedType) params.set('type', selectedType);
 
-  const fetchPGs = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      
-      const response = await fetch(`${API_URL}/api/pg?limit=20`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        mode: 'cors'
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch listings`);
-      }
-      
-      const result = await response.json();
-      
-      let pgs: PGListing[] = [];
-      
-      if (result.success) {
-        if (result.data?.items && Array.isArray(result.data.items)) {
-          pgs = result.data.items;
-        }
-        else if (Array.isArray(result.data)) {
-          pgs = result.data;
-        }
-        else if (Array.isArray(result.items)) {
-          pgs = result.items;
-        }
-      } else {
-        throw new Error(result.message || 'Failed to fetch PGs');
-      }
-      
-      const publishedPGs = pgs.filter(pg => pg.published !== false);
-      
-      if (publishedPGs.length === 0) {
-        setError('No PGs found');
-        setAllPGs([]);
-        setDisplayedPGs([]);
-        return;
-      }
-      
-      setAllPGs(publishedPGs);
-      updateDisplayedPGs(publishedPGs);
-      
-    } catch (err: any) {
-      setError('Failed to load data');
-    } finally {
-      setLoading(false);
-    }
+    navigate(`/pg?${params.toString()}`);
   };
 
-  const updateDisplayedPGs = (pgs: PGListing[]) => {
-    const sortedPGs = [...pgs].sort((a, b) => {
-      if (a.featured && !b.featured) return -1;
-      if (!a.featured && b.featured) return 1;
-      
-      if ((a.rating || 0) > (b.rating || 0)) return -1;
-      if ((a.rating || 0) < (b.rating || 0)) return 1;
-      
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
-    
-    const initialCount = Math.min(itemsPerPage, sortedPGs.length);
-    setDisplayedPGs(sortedPGs.slice(0, initialCount));
-  };
-
-  const transformForPGCard = (pg: PGListing) => {
-    return {
-      id: pg._id || pg.id || '',
-      name: pg.name,
-      slug: pg.slug || pg._id,
-      description: pg.description,
-      price: pg.price,
-      images: pg.images || [],
-      gallery: pg.gallery || [],
-      city: pg.city,
-      locality: pg.locality,
-      type: pg.type,
-      amenities: pg.amenities || [],
-      rating: pg.rating || 0,
-      reviewCount: pg.reviewCount || 0,
-      ownerName: pg.ownerName,
-      ownerPhone: pg.ownerPhone,
-      featured: pg.featured || false,
-      verified: pg.verified || false,
-      wifi: pg.wifi || pg.amenities?.some(a => a.toLowerCase().includes('wifi')) || false,
-      meals: pg.meals || pg.amenities?.some(a => a.toLowerCase().includes('meal')) || false,
-      ac: pg.ac || pg.amenities?.some(a => a.toLowerCase().includes('ac') || a.toLowerCase().includes('air')) || false,
-      parking: pg.parking || pg.amenities?.some(a => a.toLowerCase().includes('park')) || false,
-      distance: pg.distance,
-    };
-  };
-
-  if (loading) {
-    return (
-      <section className="py-10 md:py-16 bg-gradient-to-b from-white to-orange-50/30">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8 md:mb-12">
-            <div className="animate-pulse">
-              <div className="h-3 w-16 md:h-4 md:w-24 bg-gray-200 rounded"></div>
-              <div className="h-6 w-48 md:h-8 md:w-64 bg-gray-200 rounded mt-2"></div>
-            </div>
-            <div className="h-8 w-24 md:h-10 md:w-32 bg-gray-200 rounded animate-pulse"></div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white border rounded-xl overflow-hidden animate-pulse">
-                <div className="h-40 md:h-48 bg-gray-200"></div>
-                <div className="p-3 md:p-4">
-                  <div className="h-3 md:h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                  <div className="h-2 md:h-3 bg-gray-200 rounded w-1/2 mb-3 md:mb-4"></div>
-                  <div className="h-6 md:h-8 bg-gray-200 rounded"></div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-    );
-  }
-
-  if (error) {
-    return (
-      <section className="py-10 md:py-16 bg-gradient-to-b from-white to-orange-50/30">
-        <div className="container mx-auto px-4">
-          <div className="text-center py-8 md:py-12 border border-dashed border-orange-200 rounded-xl md:rounded-2xl bg-white">
-            <div className="mx-auto mb-3 md:mb-4 h-12 w-12 md:h-16 md:w-16 rounded-full bg-orange-100 flex items-center justify-center">
-              <AlertCircle className="h-5 w-5 md:h-8 md:w-8 text-orange-600" />
-            </div>
-            <h3 className="text-lg md:text-xl font-semibold text-gray-900 mb-1 md:mb-2">Error Loading Data</h3>
-            <p className="text-sm md:text-base text-muted-foreground mb-4 md:mb-6 max-w-md mx-auto px-4">
-              {error}
-            </p>
-            <Button 
-              onClick={fetchPGs}
-              className="bg-orange-600 hover:bg-orange-700 text-sm md:text-base px-4 md:px-6 py-2 md:py-2"
-            >
-              Try Again
-            </Button>
-          </div>
-        </div>
-      </section>
-    );
-  }
+  const stats = [
+    { icon: Home, value: '500+', label: 'Verified PGs' },
+    { icon: Users, value: '10K+', label: 'Happy Students' },
+    { icon: MapPin, value: '50+', label: 'Locations' },
+  ];
 
   return (
-    <section className="py-10 md:py-16 bg-gradient-to-b from-white to-orange-50/30">
-      <div className="container mx-auto px-4">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 md:gap-4 mb-6 md:mb-12">
-          <div>
-            <div className="inline-flex items-center gap-1 md:gap-2 mb-2 md:mb-3 px-3 md:px-4 py-1.5 md:py-2 bg-orange-100 text-orange-700 rounded-full border border-orange-200">
-              <Star className="h-3 w-3 md:h-4 md:w-4 fill-orange-500" />
-              <span className="text-xs md:text-sm font-medium uppercase tracking-wider">
-                Featured
-              </span>
-            </div>
-            <h2 className="font-display text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900">
-              Featured PG Accommodations
-            </h2>
-          </div>
+    <section className="relative w-full min-h-[60vh] flex items-center overflow-hidden">
 
-          <div className="flex flex-col sm:flex-row gap-2 md:gap-3 mt-2 md:mt-0">
-            <Link to="/pg">
-              <Button className="bg-orange-600 hover:bg-orange-700 gap-1 md:gap-2 text-sm md:text-base px-4 md:px-6 py-2 md:py-2 w-full sm:w-auto">
-                View All
-                <ArrowRight className="h-3 w-3 md:h-4 md:w-4" />
+      {/* Background Gradient */}
+      <div className="absolute inset-0 hero-gradient opacity-95" />
+
+      {/* Content */}
+      <div className="container mx-auto px-4 relative z-10">
+
+        <div className="max-w-3xl mx-auto text-center">
+
+          {/* Heading */}
+          <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-6">
+            Find Your Perfect{' '}
+            <span className="text-orange-400">Home Away</span> From Home
+          </h1>
+
+          {/* Search Box */}
+          <div className="bg-white rounded-2xl p-4 md:p-6 shadow-xl">
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+
+              {/* Search Input */}
+              <div className="md:col-span-2 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+
+                <Input
+                  placeholder="Search PG name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 h-11"
+                />
+              </div>
+
+              {/* Location */}
+              <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+                <SelectTrigger className="h-11">
+                  <MapPin className="h-4 w-4 mr-2 text-gray-500" />
+                  <SelectValue placeholder="Location" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  {locations.slice(1).map((location) => (
+                    <SelectItem key={location} value={location}>
+                      {location}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Type */}
+              <Select value={selectedType} onValueChange={setSelectedType}>
+                <SelectTrigger className="h-11">
+                  <Users className="h-4 w-4 mr-2 text-gray-500" />
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  <SelectItem value="boys">Boys</SelectItem>
+                  <SelectItem value="girls">Girls</SelectItem>
+                  <SelectItem value="co-ed">Co-Ed</SelectItem>
+                  <SelectItem value="family">Family</SelectItem>
+                </SelectContent>
+              </Select>
+
+            </div>
+
+            {/* Search Button */}
+            <div className="mt-3">
+              <Button
+                onClick={handleSearch}
+                className="w-full h-11 bg-orange-500 hover:bg-orange-600 text-white"
+              >
+                <Search className="h-5 w-5 mr-2" />
+                Search
               </Button>
-            </Link>
-          </div>
-        </div>
-
-        {displayedPGs.length === 0 ? (
-          <div className="text-center py-8 md:py-12 border border-dashed border-gray-200 rounded-xl md:rounded-2xl bg-white">
-            <div className="mx-auto mb-3 md:mb-4 h-12 w-12 md:h-16 md:w-16 rounded-full bg-gray-100 flex items-center justify-center">
-              <span className="text-xl md:text-2xl">🏠</span>
             </div>
-            <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-1">No PGs Available</h3>
-            <p className="text-sm md:text-base text-gray-600 max-w-md mx-auto px-4">
-              There are no accommodations available at the moment.
-            </p>
+
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-            {displayedPGs.map((pg, index) => (
-              <div key={pg._id || pg.id || index} className="relative">
-                {pg.featured && (
-                  <div className="absolute top-2 left-2 md:top-3 md:left-3 z-10">
-                    <div className="inline-flex items-center gap-1 px-2 md:px-3 py-0.5 md:py-1 bg-orange-500 text-white text-xs font-semibold rounded-full shadow-sm">
-                      <Star className="h-2 w-2 md:h-3 md:w-3 fill-white" />
-                      Featured
-                    </div>
-                  </div>
-                )}
-                <PGCard pg={transformForPGCard(pg)} index={index} />
+
+          {/* Stats */}
+          <div className="flex justify-center gap-8 mt-8 flex-wrap text-white">
+            {stats.map((stat) => (
+              <div key={stat.label} className="text-center">
+                <div className="flex items-center justify-center gap-2 text-lg font-bold">
+                  <stat.icon className="h-4 w-4 text-orange-400" />
+                  {stat.value}
+                </div>
+                <p className="text-sm text-gray-200">{stat.label}</p>
               </div>
             ))}
           </div>
-        )}
+
+        </div>
       </div>
+
+      {/* Bottom Curve Wave */}
+      <div className="absolute bottom-0 left-0 w-full overflow-hidden leading-none">
+        <svg
+          viewBox="0 0 1440 120"
+          xmlns="http://www.w3.org/2000/svg"
+          className="w-full h-[80px]"
+          preserveAspectRatio="none"
+        >
+          <path
+            d="M0,96L60,85.3C120,75,240,53,360,42.7C480,32,600,32,720,42.7C840,53,960,75,1080,80C1200,85,1320,75,1380,69.3L1440,64V120H0Z"
+            fill="white"
+          />
+        </svg>
+      </div>
+
     </section>
   );
 }
