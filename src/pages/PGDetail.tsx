@@ -6,7 +6,8 @@ import {
   Check, ChevronLeft, ChevronRight, X, Calendar, Clock, Users,
   Download, MessageCircle, Navigation,
   TrendingUp, Home, Mail, PhoneCall, Crown,
-  BadgeCheck, Users as UsersIcon, Building, Route
+  BadgeCheck, Users as UsersIcon, Building, Route,
+  Bus, Train, Coffee, ShoppingBag, Hospital, School, Landmark
 } from 'lucide-react';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
@@ -322,7 +323,7 @@ const PGDetail = () => {
     );
   }
 
-  // Mock data for reviews and rooms (these can remain as fallbacks)
+  // Mock data for reviews (these can remain as fallbacks)
   const reviews = [
     {
       id: 1,
@@ -601,26 +602,15 @@ const PGDetail = () => {
                     <h2 className="text-xl font-bold text-gray-900 mb-4">About this PG</h2>
                     <p className="text-gray-700 mb-6">{pg.description}</p>
                     
-                    <div className="space-y-4">
-                      <div>
-                        <h3 className="font-bold text-gray-900 mb-2">Features</h3>
-                        <div className="grid grid-cols-2 gap-2">
-                          {pg.amenities.slice(0, 6).map((amenity, index) => (
-                            <div key={index} className="flex items-center gap-2">
-                              <Check className="h-4 w-4 text-green-500" />
-                              <span className="text-gray-600">{amenity}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <h3 className="font-bold text-gray-900 mb-2">Ideal For</h3>
-                        <div className="flex flex-wrap gap-2">
-                          <Badge className="bg-blue-50 text-blue-700">CU Students</Badge>
-                          <Badge className="bg-green-50 text-green-700">Working Professionals</Badge>
-                          <Badge className="bg-purple-50 text-purple-700">Exam Aspirants</Badge>
-                        </div>
+                    <div>
+                      <h3 className="font-bold text-gray-900 mb-2">Features</h3>
+                      <div className="grid grid-cols-2 gap-2">
+                        {pg.amenities.slice(0, 6).map((amenity, index) => (
+                          <div key={index} className="flex items-center gap-2">
+                            <Check className="h-4 w-4 text-green-500" />
+                            <span className="text-gray-600">{amenity}</span>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -688,51 +678,77 @@ const PGDetail = () => {
                   </div>
                 </TabsContent>
 
-                {/* Location Tab */}
+                {/* Advanced Location Tab */}
                 <TabsContent value="location" className="mt-6">
                   <div className="bg-white rounded-xl p-6 border">
                     <h2 className="text-xl font-bold text-gray-900 mb-6">Location</h2>
                     
-                    <div className="space-y-6">
+                    {/* Address Section with Map Preview */}
+                    <div className="mb-8 p-4 bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl">
                       <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
-                          <MapPin className="h-5 w-5 text-orange-600" />
+                        <div className="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
+                          <MapPin className="h-6 w-6 text-orange-600" />
                         </div>
-                        <div>
-                          <h3 className="font-bold text-gray-900">{pg.address}</h3>
+                        <div className="flex-1">
+                          <h3 className="font-bold text-gray-900 text-lg">Property Address</h3>
+                          <p className="text-gray-700 mt-1">{pg.address}</p>
                           <p className="text-gray-600 mt-1">{pg.locality || pg.city} • {pg.city}</p>
-                          <p className="text-orange-600 font-medium mt-2">{pg.distance || 'Near Chandigarh University'}</p>
+                          <div className="flex items-center gap-2 mt-3">
+                            <Badge className="bg-orange-100 text-orange-700">
+                              <Navigation className="h-3 w-3 mr-1" />
+                              {pg.distance || 'Near Chandigarh University'}
+                            </Badge>
+                          </div>
                         </div>
                       </div>
-                      
-                      <div className="h-48 bg-gradient-to-r from-orange-100 to-amber-100 rounded-lg flex items-center justify-center">
-                        <div className="text-center">
-                          <Building className="h-8 w-8 text-orange-500 mx-auto mb-2" />
-                          <h4 className="font-bold text-gray-900 mb-1">Near Chandigarh University</h4>
-                          <p className="text-gray-600 text-sm">Easy access to all CU gates</p>
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="p-3 bg-gray-50 rounded-lg">
-                          <h4 className="font-bold text-gray-900 text-sm mb-1">Nearby</h4>
-                          <p className="text-xs text-gray-600">• CU Gate 1: 5min walk</p>
-                          <p className="text-xs text-gray-600">• Library: 10min walk</p>
-                        </div>
-                        <div className="p-3 bg-gray-50 rounded-lg">
-                          <h4 className="font-bold text-gray-900 text-sm mb-1">Transport</h4>
-                          <p className="text-xs text-gray-600">• Auto stand: 2min walk</p>
-                          <p className="text-xs text-gray-600">• Bus stop: 5min walk</p>
-                        </div>
-                      </div>
-                      
+                    </div>
+
+                    {/* Map Action Buttons */}
+                    <div className="grid grid-cols-2 gap-3 mb-8">
                       <Button 
                         onClick={viewOnMap}
-                        className="w-full bg-orange-600 hover:bg-orange-700 gap-2"
+                        className="bg-orange-600 hover:bg-orange-700 gap-2"
                       >
                         <Navigation className="h-4 w-4" />
-                        View on Google Maps
+                        View on Maps
                       </Button>
+                      <Button 
+                        variant="outline"
+                        className="border-orange-300 hover:bg-orange-50 gap-2"
+                        onClick={() => {
+                          const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(pg.address)}`;
+                          window.open(url, '_blank');
+                        }}
+                      >
+                        <Route className="h-4 w-4" />
+                        Get Directions
+                      </Button>
+                    </div>
+
+                    {/* Travel Time Summary */}
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-orange-600" />
+                        Estimated Travel Times
+                      </h4>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <p className="text-gray-600">To CU Gate 1</p>
+                          <p className="font-bold text-gray-900">5 min walk</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600">To City Center</p>
+                          <p className="font-bold text-gray-900">15 min drive</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600">To Railway Station</p>
+                          <p className="font-bold text-gray-900">20 min drive</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600">To Airport</p>
+                          <p className="font-bold text-gray-900">45 min drive</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </TabsContent>
