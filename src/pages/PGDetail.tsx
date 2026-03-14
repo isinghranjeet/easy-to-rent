@@ -13,7 +13,6 @@ import { Footer } from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Progress } from '@/components/ui/progress';
 import { Slider } from '@/components/ui/slider';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -63,7 +62,8 @@ interface PGListing {
 }
 
 const PGDetail = () => {
-  const { id } = useParams();
+  const { slug } = useParams();
+  const id = slug
   const [currentImage, setCurrentImage] = useState(0);
   const [showGallery, setShowGallery] = useState(false);
   const [selectedTab, setSelectedTab] = useState('overview');
@@ -95,7 +95,27 @@ const PGDetail = () => {
 
     return () => clearTimeout(timer);
   }, [id]);
+  const api_url = import.meta.env.VITE_API_URL
+  const url = new URL(`${api_url}/pg/${id}`)
+  
 
+
+  useEffect( ()=>{
+
+  const fetchData = async () =>{
+     try{
+      const pgData = await fetch(url)
+      const vals = await pgData.json()
+      setPg(vals.data)
+      console.log("pg ---- " , pg)
+     }catch(e){
+       console.log(e)
+     }
+  }
+
+  fetchData()
+  } , [])
+  
   useEffect(() => {
     if (pg) {
       const basePrice = pg.price;
@@ -175,6 +195,7 @@ const PGDetail = () => {
     });
   };
 
+
   const handleWhatsAppContact = () => {
     if (!pg) return;
     
@@ -210,12 +231,6 @@ const PGDetail = () => {
     toast.info('Opening location on Google Maps');
   };
 
-  const scheduleVisit = () => {
-    toast.success('Visit scheduled!', {
-      description: 'We\'ll send you a confirmation.',
-    });
-    setShowContactForm(true);
-  };
 
   const handleShare = async () => {
     if (!pg) return;

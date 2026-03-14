@@ -154,7 +154,7 @@ const PGList = () => {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       
-      const result = await response.json();
+      const result = await response.json();//result of the fetching 
       console.log('📦 API Response:', result);
       
       if (!result.success) {
@@ -178,7 +178,6 @@ const PGList = () => {
         return;
       }
       
-      console.log(`✅ Received ${listingsData.length} listings from database (Page ${currentPageData}/${newTotalPages}, Total: ${newTotalCount})`);
       
       // Filter out unpublished listings if needed (backend should handle this)
       const publishedListings = listingsData.filter((listing: any) => 

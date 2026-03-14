@@ -169,7 +169,8 @@ export function PGCard({ pg, index = 0 }: PGCardProps) {
     const newWishlistState = !currentWishlistState;
     
     try {
-      toggleWishlist(pg.id);
+      toggleWishlist(pg.id)
+      ;
       
       toast({
         title: newWishlistState ? "Added to Wishlist" : "Removed from Wishlist",
@@ -466,7 +467,7 @@ export function PGCard({ pg, index = 0 }: PGCardProps) {
 
           {/* ACTION BUTTONS */}
           <div className="grid grid-cols-3 gap-2">
-            <Link to={`/pg/${pg.slug}`}>
+            <Link to={`/pg/${pg.id}`}>
               <Button variant="outline" className="w-full">
                 View
               </Button>
