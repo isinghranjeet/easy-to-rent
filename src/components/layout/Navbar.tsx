@@ -90,7 +90,7 @@ export function Navbar() {
 
             {/* Desktop Navigation - Visible on lg and up */}
             <div className="hidden lg:flex items-center gap-1">
-              {navLinks.map((link) => (
+              {user?.role !== 'owner' && navLinks.map((link) => (
                 <Link
                   key={link.href}
                   to={link.href}
@@ -117,45 +117,49 @@ export function Navbar() {
 
             {/* Desktop Action Buttons - Visible on lg and up */}
             <div className="hidden lg:flex items-center gap-3">
-              {/* Compare Button - Desktop with Orange Theme */}
-              <Link to="/compare">
-                <Button
-                  variant="outline"
-                  className="relative flex items-center gap-2 border-2 border-gray-200 hover:border-orange-400 hover:bg-orange-50 transition-all duration-300 group"
-                >
-                  <Scale className="h-4 w-4 text-gray-600 group-hover:text-orange-500 group-hover:scale-110 transition-all duration-300" />
-                  <span className="group-hover:text-orange-600">Compare</span>
-                  {compareList.length > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white px-2 py-0.5 rounded-full text-xs font-bold animate-pulse">
-                      {compareList.length}
-                    </span>
-                  )}
-                </Button>
-              </Link>
+              {user?.role !== 'owner' && (
+                <>
+                  {/* Compare Button - Desktop with Orange Theme */}
+                  <Link to="/compare">
+                    <Button
+                      variant="outline"
+                      className="relative flex items-center gap-2 border-2 border-gray-200 hover:border-orange-400 hover:bg-orange-50 transition-all duration-300 group"
+                    >
+                      <Scale className="h-4 w-4 text-gray-600 group-hover:text-orange-500 group-hover:scale-110 transition-all duration-300" />
+                      <span className="group-hover:text-orange-600">Compare</span>
+                      {compareList.length > 0 && (
+                        <span className="absolute -top-2 -right-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white px-2 py-0.5 rounded-full text-xs font-bold animate-pulse">
+                          {compareList.length}
+                        </span>
+                      )}
+                    </Button>
+                  </Link>
 
-              {/* Wishlist Button - Desktop */}
-              <Link to="/wishlist">
-                <Button
-                  variant="outline"
-                  className="relative flex items-center gap-2 border-2 border-gray-200 hover:border-orange-400 hover:bg-orange-50 transition-all duration-300 group"
-                >
-                  <Heart className="h-4 w-4 text-gray-600 group-hover:text-orange-500 group-hover:scale-110 transition-all duration-300" />
-                  <span className="group-hover:text-orange-600">Wishlist</span>
-                  {wishlist.length > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-gradient-to-r from-orange-500 to-red-500 text-white px-2 py-0.5 rounded-full text-xs font-bold animate-pulse">
-                      {wishlist.length}
-                    </span>
-                  )}
-                </Button>
-              </Link>
+                  {/* Wishlist Button - Desktop */}
+                  <Link to="/wishlist">
+                    <Button
+                      variant="outline"
+                      className="relative flex items-center gap-2 border-2 border-gray-200 hover:border-orange-400 hover:bg-orange-50 transition-all duration-300 group"
+                    >
+                      <Heart className="h-4 w-4 text-gray-600 group-hover:text-orange-500 group-hover:scale-110 transition-all duration-300" />
+                      <span className="group-hover:text-orange-600">Wishlist</span>
+                      {wishlist.length > 0 && (
+                        <span className="absolute -top-2 -right-2 bg-gradient-to-r from-orange-500 to-red-500 text-white px-2 py-0.5 rounded-full text-xs font-bold animate-pulse">
+                          {wishlist.length}
+                        </span>
+                      )}
+                    </Button>
+                  </Link>
 
-              {/* Search Button - Desktop */}
-              <Link to="/pg">
-                <Button className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-md shadow-orange-200 hover:shadow-lg transform hover:scale-105 transition-all duration-300">
-                  <Search className="h-4 w-4" />
-                  Search PG
-                </Button>
-              </Link>
+                  {/* Search Button - Desktop */}
+                  <Link to="/pg">
+                    <Button className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-md shadow-orange-200 hover:shadow-lg transform hover:scale-105 transition-all duration-300">
+                      <Search className="h-4 w-4" />
+                      Search PG
+                    </Button>
+                  </Link>
+                </>
+              )}
 
               {/* Auth Section - Desktop */}
               {isAuthenticated ? (
@@ -186,6 +190,16 @@ export function Navbar() {
                         <User className="h-4 w-4" />
                         Profile
                       </Link>
+                      {(user?.role === 'owner' || user?.role === 'admin') && (
+                        <Link
+                          to="/owner"
+                          className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                          onClick={() => setShowProfileMenu(false)}
+                        >
+                          <Building2 className="h-4 w-4" />
+                          Dashboard
+                        </Link>
+                      )}
                       <Link
                         to="/settings"
                         className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
@@ -217,47 +231,59 @@ export function Navbar() {
                   )}
                 </div>
               ) : (
-                <Link to="/login">
-                  <Button className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-md shadow-orange-200 transform hover:scale-105 transition-all duration-300">
-                    <LogIn className="h-4 w-4" />
-                    Login
-                  </Button>
-                </Link>
+                <div className="flex items-center gap-3">
+                  <Link to="/owner/register">
+                    <Button variant="ghost" className="hidden xl:flex items-center gap-2 text-gray-700 hover:text-orange-600 hover:bg-orange-50 transition-all duration-300">
+                      <Plus className="h-4 w-4 text-orange-500" />
+                      Register Your Property
+                    </Button>
+                  </Link>
+                  <Link to="/login">
+                    <Button className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-md shadow-orange-200 transform hover:scale-105 transition-all duration-300">
+                      <LogIn className="h-4 w-4" />
+                      Login
+                    </Button>
+                  </Link>
+                </div>
               )}
             </div>
 
             {/* Mobile/Tablet Action Icons - Visible below lg */}
             <div className="flex lg:hidden items-center gap-1 sm:gap-2">
-              {/* Compare Icon - Mobile/Tablet with Orange Theme */}
-              <Link to="/compare" className="relative p-1.5 sm:p-2">
-                <Button variant="ghost" size="icon" className="relative h-9 w-9 sm:h-10 sm:w-10 rounded-full hover:bg-orange-50">
-                  <Scale className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600" />
-                  {compareList.length > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-gradient-to-r from-orange-500 to-orange-600 text-white w-4 h-4 sm:w-5 sm:h-5 rounded-full text-xs flex items-center justify-center">
-                      {compareList.length}
-                    </span>
-                  )}
-                </Button>
-              </Link>
+              {user?.role !== 'owner' && (
+                <>
+                  {/* Compare Icon - Mobile/Tablet with Orange Theme */}
+                  <Link to="/compare" className="relative p-1.5 sm:p-2">
+                    <Button variant="ghost" size="icon" className="relative h-9 w-9 sm:h-10 sm:w-10 rounded-full hover:bg-orange-50">
+                      <Scale className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600" />
+                      {compareList.length > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-gradient-to-r from-orange-500 to-orange-600 text-white w-4 h-4 sm:w-5 sm:h-5 rounded-full text-xs flex items-center justify-center">
+                          {compareList.length}
+                        </span>
+                      )}
+                    </Button>
+                  </Link>
 
-              {/* Wishlist Icon - Mobile/Tablet */}
-              <Link to="/wishlist" className="relative p-1.5 sm:p-2">
-                <Button variant="ghost" size="icon" className="relative h-9 w-9 sm:h-10 sm:w-10 rounded-full hover:bg-orange-50">
-                  <Heart className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600" />
-                  {wishlist.length > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-gradient-to-r from-orange-500 to-red-500 text-white w-4 h-4 sm:w-5 sm:h-5 rounded-full text-xs flex items-center justify-center">
-                      {wishlist.length}
-                    </span>
-                  )}
-                </Button>
-              </Link>
+                  {/* Wishlist Icon - Mobile/Tablet */}
+                  <Link to="/wishlist" className="relative p-1.5 sm:p-2">
+                    <Button variant="ghost" size="icon" className="relative h-9 w-9 sm:h-10 sm:w-10 rounded-full hover:bg-orange-50">
+                      <Heart className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600" />
+                      {wishlist.length > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-gradient-to-r from-orange-500 to-red-500 text-white w-4 h-4 sm:w-5 sm:h-5 rounded-full text-xs flex items-center justify-center">
+                          {wishlist.length}
+                        </span>
+                      )}
+                    </Button>
+                  </Link>
 
-              {/* Search Icon - Mobile/Tablet */}
-              <Link to="/pg" className="p-1.5 sm:p-2">
-                <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-10 sm:w-10 rounded-full hover:bg-orange-50">
-                  <Search className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600" />
-                </Button>
-              </Link>
+                  {/* Search Icon - Mobile/Tablet */}
+                  <Link to="/pg" className="p-1.5 sm:p-2">
+                    <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-10 sm:w-10 rounded-full hover:bg-orange-50">
+                      <Search className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600" />
+                    </Button>
+                  </Link>
+                </>
+              )}
 
               {/* Profile/Login Icon - Mobile/Tablet */}
               {isAuthenticated ? (
@@ -342,7 +368,7 @@ export function Navbar() {
 
             {/* Mobile Navigation Links */}
             <div className="space-y-1">
-              {navLinks.map((link) => (
+              {user?.role !== 'owner' && navLinks.map((link) => (
                 <Link
                   key={link.href}
                   to={link.href}
@@ -363,47 +389,51 @@ export function Navbar() {
 
             {/* Mobile Action Buttons */}
             <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-200">
-              <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                {/* Compare Button - Mobile Menu with Orange Theme */}
-                <Link
-                  to="/compare"
-                  onClick={() => setIsOpen(false)}
-                  className="flex items-center justify-center gap-2 p-3 bg-orange-50 text-orange-600 rounded-xl hover:bg-orange-100 transition-colors"
-                >
-                  <Scale className="h-4 w-4 sm:h-5 sm:w-5" />
-                  <span className="text-sm sm:text-base font-medium">Compare</span>
-                  {compareList.length > 0 && (
-                    <span className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-1.5 py-0.5 rounded-full text-xs">
-                      {compareList.length}
-                    </span>
-                  )}
-                </Link>
+              {user?.role !== 'owner' && (
+                <>
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                    {/* Compare Button - Mobile Menu with Orange Theme */}
+                    <Link
+                      to="/compare"
+                      onClick={() => setIsOpen(false)}
+                      className="flex items-center justify-center gap-2 p-3 bg-orange-50 text-orange-600 rounded-xl hover:bg-orange-100 transition-colors"
+                    >
+                      <Scale className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <span className="text-sm sm:text-base font-medium">Compare</span>
+                      {compareList.length > 0 && (
+                        <span className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-1.5 py-0.5 rounded-full text-xs">
+                          {compareList.length}
+                        </span>
+                      )}
+                    </Link>
 
-                {/* Wishlist Button - Mobile Menu */}
-                <Link
-                  to="/wishlist"
-                  onClick={() => setIsOpen(false)}
-                  className="flex items-center justify-center gap-2 p-3 bg-orange-50 text-orange-600 rounded-xl hover:bg-orange-100 transition-colors"
-                >
-                  <Heart className="h-4 w-4 sm:h-5 sm:w-5" />
-                  <span className="text-sm sm:text-base font-medium">Wishlist</span>
-                  {wishlist.length > 0 && (
-                    <span className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-1.5 py-0.5 rounded-full text-xs">
-                      {wishlist.length}
-                    </span>
-                  )}
-                </Link>
-              </div>
+                    {/* Wishlist Button - Mobile Menu */}
+                    <Link
+                      to="/wishlist"
+                      onClick={() => setIsOpen(false)}
+                      className="flex items-center justify-center gap-2 p-3 bg-orange-50 text-orange-600 rounded-xl hover:bg-orange-100 transition-colors"
+                    >
+                      <Heart className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <span className="text-sm sm:text-base font-medium">Wishlist</span>
+                      {wishlist.length > 0 && (
+                        <span className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-1.5 py-0.5 rounded-full text-xs">
+                          {wishlist.length}
+                        </span>
+                      )}
+                    </Link>
+                  </div>
 
-              {/* Search Button - Mobile Menu */}
-              <Link
-                to="/pg"
-                onClick={() => setIsOpen(false)}
-                className="flex items-center justify-center gap-2 p-3 mt-2 sm:mt-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all duration-300 font-medium shadow-lg shadow-orange-200"
-              >
-                <Search className="h-4 w-4 sm:h-5 sm:w-5" />
-                <span className="text-sm sm:text-base">Search PG</span>
-              </Link>
+                  {/* Search Button - Mobile Menu */}
+                  <Link
+                    to="/pg"
+                    onClick={() => setIsOpen(false)}
+                    className="flex items-center justify-center gap-2 p-3 mt-2 sm:mt-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all duration-300 font-medium shadow-lg shadow-orange-200"
+                  >
+                    <Search className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span className="text-sm sm:text-base">Search PG</span>
+                  </Link>
+                </>
+              )}
             </div>
 
             {/* Mobile Auth Actions */}
@@ -434,6 +464,16 @@ export function Navbar() {
                     <HelpCircle className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />
                     Help
                   </Link>
+                  {(user?.role === 'owner' || user?.role === 'admin') && (
+                    <Link
+                      to="/owner"
+                      onClick={() => setIsOpen(false)}
+                      className="flex items-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-gray-700 hover:bg-orange-50 rounded-xl transition-colors mb-1 text-sm sm:text-base"
+                    >
+                      <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />
+                      Dashboard
+                    </Link>
+                  )}
                   <button
                     onClick={() => {
                       logout();
@@ -446,14 +486,24 @@ export function Navbar() {
                   </button>
                 </>
               ) : (
-                <Link
-                  to="/login"
-                  onClick={() => setIsOpen(false)}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all duration-300 font-medium shadow-lg shadow-orange-200 text-sm sm:text-base"
-                >
-                  <LogIn className="h-4 w-4 sm:h-5 sm:w-5" />
-                  Login / Sign Up
-                </Link>
+                  <div className="flex flex-col gap-2">
+                    <Link
+                      to="/owner/register"
+                      onClick={() => setIsOpen(false)}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-orange-200 text-orange-600 rounded-xl hover:bg-orange-50 transition-all duration-300 font-medium text-sm sm:text-base"
+                    >
+                      <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
+                      Register Your Property
+                    </Link>
+                    <Link
+                      to="/login"
+                      onClick={() => setIsOpen(false)}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all duration-300 font-medium shadow-lg shadow-orange-200 text-sm sm:text-base"
+                    >
+                      <LogIn className="h-4 w-4 sm:h-5 sm:w-5" />
+                      Login / Sign Up
+                    </Link>
+                  </div>
               )}
             </div>
           </div>

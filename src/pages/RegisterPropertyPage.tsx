@@ -8,8 +8,9 @@ import {
   Check, X, Clock, Award, TrendingUp, Globe,
   Mail, Calendar, Lock, ShieldCheck
 } from 'lucide-react';
+import { api } from '@/services/api';
 import { toast } from 'sonner';
-const API_URL = 'https://eassy-to-rent-backend.onrender.com/api';
+import { validateImage } from '@/lib/utils/fileUtils';
 const RegisterPropertyPage = () => {
   const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(1);
@@ -31,7 +32,7 @@ const RegisterPropertyPage = () => {
     // Step 3: Amenities
     amenities: ['WiFi', 'Power Backup', 'Water Supply'],
     // Step 4: Photos & Verification
-    images: [],
+    images: [] as { file: File; preview: string }[],
     verificationDocuments: []
   });
   const [loading, setLoading] = useState(false);
@@ -45,15 +46,13 @@ const RegisterPropertyPage = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch(`${API_URL}/stats`);
-        const data = await response.json();
-        if (data.success) {
+        const response = await api.getStats();
+        if (response.success) {
           setStats({
-            totalListings: data.data.totalPGs || 12543,
-            monthlySearches: data.data.totalPGs * 15 || 184927,
-            verifiedOwners: data.data.verifiedPGs || 8472
+            totalListings: response.data.total || 12543,
+            monthlySearches: response.data.total * 15 || 184927,
+            verifiedOwners: response.data.verified || 8472
           });
-          
         }
       } catch (error) {
         console.error('Error fetching stats:', error);
@@ -190,7 +189,9 @@ const RegisterPropertyPage = () => {
     setLoading(true);
 
     try {
-      // Prepare data for backend
+      const formDataToSend = new FormData();
+      
+      // Basic fields
       const pgData = {
         name: formData.propertyName,
         description: formData.description,
@@ -200,7 +201,6 @@ const RegisterPropertyPage = () => {
         price: Number(formData.price),
         type: formData.propertyType,
         amenities: formData.amenities,
-        images: formData.images,
         ownerName: formData.fullName,
         ownerEmail: formData.email,
         ownerPhone: formData.phone,
@@ -210,24 +210,21 @@ const RegisterPropertyPage = () => {
         featured: false
       };
 
-      const response = await fetch(`${API_URL}/pg`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(pgData),
+      // Append data as a JSON string for the 'data' field
+      formDataToSend.append('data', JSON.stringify(pgData));
+
+      // Append images
+      formData.images.forEach((imgObj) => {
+        formDataToSend.append('images', imgObj.file);
       });
 
-      const result = await response.json();
+      const result = await api.createPGListing(formDataToSend);
 
       if (result.success) {
         toast.success('🎉 PG Listed Successfully!');
-        
-        // Redirect to PG detail page after 2 seconds
         setTimeout(() => {
           navigate(`/pg/${result.data._id}`);
         }, 2000);
-        
       } else {
         toast.error(result.message || 'Failed to list PG');
       }
@@ -239,26 +236,42 @@ const RegisterPropertyPage = () => {
     }
   };
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
-    const newImages = files.map(file => URL.createObjectURL(file));
-    setFormData(prev => ({
-      ...prev,
-      images: [...prev.images, ...newImages].slice(0, 10) // Limit to 10 images
-    }));
-    
-    // Simulate upload progress
-    setUploadProgress(0);
-    const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          toast.success('Images uploaded successfully!');
-          return 100;
-        }
-        return prev + 10;
-      });
-    }, 100);
+    if (files.length === 0) return;
+
+    setLoading(true);
+    setUploadProgress(10);
+
+    const newImageObjects = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i] as File;
+      const validation = validateImage(file);
+      if (!validation.valid) {
+        toast.error(`${file.name}: ${validation.error}`);
+        continue;
+      }
+
+      try {
+        const preview = URL.createObjectURL(file);
+        newImageObjects.push({ file, preview });
+        setUploadProgress(10 + Math.round(((i + 1) / files.length) * 80));
+      } catch (error) {
+        toast.error(`Failed to process ${file.name}`);
+      }
+    }
+
+    if (newImageObjects.length > 0) {
+      setFormData(prev => ({
+        ...prev,
+        images: [...prev.images, ...newImageObjects].slice(0, 10) // Limit to 10 images
+      }));
+      toast.success(`${newImageObjects.length} images added successfully!`);
+    }
+
+    setUploadProgress(100);
+    setTimeout(() => setUploadProgress(0), 1000);
+    setLoading(false);
   };
 
   const removeImage = (index) => {
@@ -631,10 +644,10 @@ const RegisterPropertyPage = () => {
                       Uploaded Photos ({formData.images.length}/10)
                     </h4>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                      {formData.images.map((img, index) => (
+                      {formData.images.map((imgObj, index) => (
                         <div key={index} className="relative group">
                           <img
-                            src={img}
+                            src={imgObj.preview}
                             alt={`PG photo ${index + 1}`}
                             className="w-full h-32 object-cover rounded-lg"
                           />

@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -23,8 +24,9 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { api, PGListing } from '@/services/api';
 import { toast } from 'sonner';
+import { validateImage } from '@/lib/utils/fileUtils';
 
-// ─────────── Amenity options ───────────
+// ─────────── Constants ───────────
 const AMENITY_OPTIONS = [
   'WiFi', 'AC', 'Geyser', 'Parking', 'Laundry', 'Food/Mess', 'Power Backup',
   'Security', 'CCTV', 'RO Water', 'Refrigerator', 'TV', 'Gym', 'Study Room',
@@ -32,6 +34,7 @@ const AMENITY_OPTIONS = [
 ];
 
 const ROOM_TYPES = ['Single', 'Double', 'Triple', 'Four Sharing'];
+const MAX_IMAGES = 10;
 
 // ─────────── Create/Edit Form ───────────
 interface PropertyFormProps {
@@ -42,6 +45,9 @@ interface PropertyFormProps {
 
 const PropertyForm = ({ editData, onSave, onCancel }: PropertyFormProps) => {
   const [saving, setSaving] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const objectUrlsRef = useRef<string[]>([]);
   const [form, setForm] = useState({
     name: '',
     description: '',
@@ -56,8 +62,33 @@ const PropertyForm = ({ editData, onSave, onCancel }: PropertyFormProps) => {
     contactPhone: '',
     contactEmail: '',
     published: true,
-    images: [] as string[],
+    images: [] as (string | { file: File; preview: string })[],
   });
+
+  const validateDescription = (description: string) => {
+    if (!description) {
+      toast.error('Description is required');
+      return false;
+    }
+    if (description.length < 200) {
+      toast.error('Description must be at least 200 characters long');
+      return false;
+    }
+    return true;
+  };
+
+
+  const validatePhone = (phone: string) => {
+    if (!phone) {
+      toast.error('Phone number is required');
+      return false;
+    }
+    if (phone.length < 10) {
+      toast.error('Phone number must be at least 10 characters long');
+      return false;
+    }
+    return true;
+  };
 
   useEffect(() => {
     if (editData) {
@@ -80,6 +111,14 @@ const PropertyForm = ({ editData, onSave, onCancel }: PropertyFormProps) => {
     }
   }, [editData]);
 
+  // Cleanup object URLs on unmount
+  useEffect(() => {
+    const urls = objectUrlsRef.current;
+    return () => {
+      urls.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, []);
+
   const toggleAmenity = (amenity: string) => {
     setForm(prev => ({
       ...prev,
@@ -98,14 +137,55 @@ const PropertyForm = ({ editData, onSave, onCancel }: PropertyFormProps) => {
     }));
   };
 
-  const handleImageUrl = () => {
-    const url = prompt('Enter image URL:');
-    if (url && url.startsWith('http')) {
-      setForm(prev => ({ ...prev, images: [...prev.images, url] }));
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const currentCount = form.images.length;
+    const remaining = MAX_IMAGES - currentCount;
+
+    if (remaining <= 0) {
+      toast.error(`Maximum ${MAX_IMAGES} images allowed`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
     }
+
+    if (files.length > remaining) {
+      toast.warning(`Only ${remaining} more image${remaining > 1 ? 's' : ''} can be added (max ${MAX_IMAGES})`);
+    }
+
+    const filesToProcess = Array.from(files).slice(0, remaining);
+    const newImageObjects: { file: File; preview: string }[] = [];
+
+    for (const file of filesToProcess) {
+      const validation = validateImage(file);
+      if (!validation.valid) {
+        toast.error(`${file.name}: ${validation.error}`);
+        continue;
+      }
+
+      const preview = URL.createObjectURL(file);
+      objectUrlsRef.current.push(preview);
+      newImageObjects.push({ file, preview });
+    }
+
+    if (newImageObjects.length > 0) {
+      setForm(prev => ({ ...prev, images: [...prev.images, ...newImageObjects] }));
+    }
+
+    // Reset input so same file can be selected again if removed
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const triggerFilePicker = () => {
+    fileInputRef.current?.click();
   };
 
   const removeImage = (idx: number) => {
+    const img = form.images[idx];
+    if (typeof img !== 'string' && img.preview) {
+      URL.revokeObjectURL(img.preview);
+    }
     setForm(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== idx) }));
   };
 
@@ -115,26 +195,66 @@ const PropertyForm = ({ editData, onSave, onCancel }: PropertyFormProps) => {
       toast.error('Please fill in Name, Address, and Price');
       return;
     }
-
+    if (!validateDescription(form.description)) {
+      return;
+    }
+    if (!validatePhone(form.contactPhone)) {
+      return;
+    }
     setSaving(true);
     try {
-      const payload = {
-        ...form,
-        price: Number(form.price),
-      };
+      const formDataToSend = new FormData();
+
+      // Separate existing URLs from new files
+      const existingUrls = form.images.filter(img => typeof img === 'string') as string[];
+      const newFiles = form.images.filter(img => typeof img !== 'string') as { file: File; preview: string }[];
+
+      // Append fields individually (skip images - handled separately)
+      Object.entries(form).forEach(([key, value]) => {
+        if (key === 'images') return;
+        if (Array.isArray(value)) {
+          value.forEach(item => formDataToSend.append(`${key}[]`, item));
+        } else if (value !== null && value !== undefined) {
+          formDataToSend.append(key, value.toString());
+        }
+      });
+
+      // Ensure price is a number
+      formDataToSend.set('price', form.price.toString());
+
+      // Add existing images if any
+      if (existingUrls.length > 0) {
+        formDataToSend.append('existingImages', JSON.stringify(existingUrls));
+      }
+
+      // Append new files
+      newFiles.forEach((imgObj) => {
+        formDataToSend.append('images', imgObj.file);
+      });
+
+      // Show upload status
+      if (newFiles.length > 0) {
+        setUploadStatus(`Uploading ${newFiles.length} image${newFiles.length > 1 ? 's' : ''}...`);
+      }
 
       if (editData) {
-        await api.updatePGListing(editData._id, payload);
+        await api.updatePGListing(editData._id, formDataToSend);
         toast.success('Property updated successfully!');
       } else {
-        await api.createPGListing(payload);
+        await api.createPGListing(formDataToSend);
         toast.success('Property created successfully!');
       }
       onSave();
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : 'Failed to save property');
+    } catch (error: any) {
+      const messages = error.errors;
+      if (messages && Array.isArray(messages)) {
+        messages.forEach((msg: string) => toast.error(msg));
+      } else {
+        toast.error(error.message || 'Failed to save property');
+      }
     } finally {
       setSaving(false);
+      setUploadStatus(null);
     }
   };
 
@@ -270,11 +390,17 @@ const PropertyForm = ({ editData, onSave, onCancel }: PropertyFormProps) => {
 
           {/* Images */}
           <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-3">Images</label>
+            <label className="block text-sm font-semibold text-gray-900 mb-3">
+              Images ({form.images.length}/{MAX_IMAGES})
+            </label>
             <div className="flex flex-wrap gap-3">
               {form.images.map((img, idx) => (
                 <div key={idx} className="relative w-24 h-24 rounded-xl overflow-hidden border border-gray-200 group">
-                  <img src={img} alt="" className="w-full h-full object-cover" />
+                  <img
+                    src={typeof img === 'string' ? img : img.preview}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
                   <button
                     type="button" onClick={() => removeImage(idx)}
                     className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
@@ -283,13 +409,23 @@ const PropertyForm = ({ editData, onSave, onCancel }: PropertyFormProps) => {
                   </button>
                 </div>
               ))}
-              <button
-                type="button" onClick={handleImageUrl}
-                className="w-24 h-24 rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 hover:border-purple-400 hover:text-purple-500 transition-colors"
-              >
-                <ImagePlus className="h-6 w-6" />
-                <span className="text-xs mt-1">Add</span>
-              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept="image/*"
+                multiple
+                className="hidden"
+              />
+              {form.images.length < MAX_IMAGES && (
+                <button
+                  type="button" onClick={triggerFilePicker}
+                  className="w-24 h-24 rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 hover:border-purple-400 hover:text-purple-500 transition-colors"
+                >
+                  <ImagePlus className="h-6 w-6" />
+                  <span className="text-xs mt-1">Add</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -333,7 +469,7 @@ const PropertyForm = ({ editData, onSave, onCancel }: PropertyFormProps) => {
               className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-medium hover:from-purple-700 hover:to-indigo-700 shadow-lg shadow-purple-500/25 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-              {editData ? 'Update Property' : 'Create Property'}
+              {uploadStatus ? uploadStatus : (editData ? 'Update Property' : 'Create Property')}
             </button>
           </div>
         </form>
@@ -464,9 +600,6 @@ const OwnerDashboard = () => {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <button onClick={() => navigate('/')} className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-                <Home className="h-4 w-4" /> <span className="hidden sm:inline">Home</span>
-              </button>
               <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 rounded-full border border-purple-100">
                 <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-xs font-bold">
                   {user?.name?.charAt(0)?.toUpperCase()}
@@ -570,7 +703,7 @@ const OwnerDashboard = () => {
                   )}
                   {/* Status Badge */}
                   <div className={`absolute top-3 left-3 px-2.5 py-1 rounded-full text-xs font-semibold ${listing.published ? 'bg-emerald-500 text-white' : 'bg-gray-700 text-white'}`}>
-                    {listing.published ? '● Live' : '○ Draft'}
+                    {listing.published ? 'Live' : 'Draft'}
                   </div>
                   {/* Type Badge */}
                   <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full text-xs font-semibold bg-white/90 backdrop-blur-sm text-gray-700 capitalize">
