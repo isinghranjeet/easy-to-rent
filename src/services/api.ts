@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // src/services/api.ts
 
-const API_BASE_URL = 'http://localhost:10000';
+const API_BASE_URL = 'https://eassy-to-rent-backend.onrender.com';
 
 // ────────────────────── Types ──────────────────────
 export interface User {
@@ -69,7 +69,7 @@ interface ApiResponse<T = any> {
 // ────────────────────── Service ──────────────────────
 export class ApiService {
   private token: string | null = null;
-  private baseURL: string;
+  public baseURL: string;
 
   constructor() {
     this.baseURL = API_BASE_URL;
@@ -101,8 +101,10 @@ export class ApiService {
     const url = `${this.baseURL}${endpoint}`;
     const token = this.getToken();
 
+    const isFormData = options.body instanceof FormData;
+
     const headers: HeadersInit = {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       'Accept': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
       ...options.headers,
@@ -114,6 +116,14 @@ export class ApiService {
       mode: 'cors',
     };
 
+    console.log(`🌐 [API_REQUEST] ${config.method} ${url}`);
+    if (isFormData) {
+      console.log('📦 [API_REQUEST] Body is FormData');
+      for (const [key, value] of (options.body as FormData).entries()) {
+        console.log(`   - ${key}:`, value instanceof File ? `File (${value.name}, ${value.size} bytes)` : value);
+      }
+    }
+
     try {
       const response = await fetch(url, config);
       const data = await response.json();
@@ -124,7 +134,9 @@ export class ApiService {
           this.clearToken();
           window.dispatchEvent(new Event('unauthorized'));
         }
-        throw new Error(data.message || data.error || 'Request failed');
+        const error: any = new Error(data.message || data.error || 'Request failed');
+        error.errors = data.errors; // Capture detailed validation errors
+        throw error;
       }
 
       return data as T;
@@ -304,18 +316,20 @@ export class ApiService {
   }
 
   /** POST /api/pg (create new PG listing) */
-  async createPGListing(data: Partial<PGListing>): Promise<ApiResponse<PGListing>> {
+  async createPGListing(data: Partial<PGListing> | FormData): Promise<ApiResponse<PGListing>> {
+    const body = data instanceof FormData ? data : JSON.stringify(data);
     return this.request<ApiResponse<PGListing>>('/api/pg', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body,
     });
   }
 
   /** PUT /api/pg/:id (update PG listing) */
-  async updatePGListing(id: string, data: Partial<PGListing>): Promise<ApiResponse<PGListing>> {
+  async updatePGListing(id: string, data: Partial<PGListing> | FormData): Promise<ApiResponse<PGListing>> {
+    const body = data instanceof FormData ? data : JSON.stringify(data);
     return this.request<ApiResponse<PGListing>>(`/api/pg/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(data),
+      body,
     });
   }
 
@@ -324,6 +338,10 @@ export class ApiService {
     return this.request<ApiResponse<{ id: string }>>(`/api/pg/${id}`, {
       method: 'DELETE',
     });
+  }
+
+  async getStats(): Promise<ApiResponse<any>> {
+    return this.request<ApiResponse<any>>('/api/pg/admin/stats'); // Backend has /api/pg/admin/stats
   }
 
   // ────────────────── Utility ──────────────────

@@ -48,13 +48,21 @@ const Login = () => {
   const location = useLocation();
   const from = (location.state as { from?: string })?.from || '/';
 
-  // Check if URL has ?role=owner param
+  // Check if URL has ?role=owner param or is on an /owner path
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (params.get('role') === 'owner') {
+    const path = location.pathname;
+    
+    if (params.get('role') === 'owner' || path.startsWith('/owner/')) {
       setIsOwner(true);
     }
-  }, [location.search]);
+    
+    if (path === '/owner/register') {
+      setMode('register');
+    } else if (path === '/owner/login' || path === '/login') {
+      setMode('login');
+    }
+  }, [location.search, location.pathname]);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -143,7 +151,12 @@ const Login = () => {
   };
 
   const switchMode = () => {
-    setMode(mode === 'login' ? 'register' : 'login');
+    const newMode = mode === 'login' ? 'register' : 'login';
+    if (isOwner) {
+      navigate(`/owner/${newMode}`, { replace: true });
+    } else {
+      setMode(newMode);
+    }
     setError(null);
     setFormData({ name: '', email: '', phone: '', password: '', confirmPassword: '' });
   };
@@ -304,31 +317,6 @@ const Login = () => {
             </Link>
           </div>
 
-          {/* ── Owner / Tenant Toggle ── */}
-          <div className="flex justify-center mb-6">
-            <div className="bg-gray-100 rounded-xl p-1 flex gap-1">
-              <button
-                onClick={() => { if (isOwner) toggleOwner(); }}
-                className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 ${
-                  !isOwner
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                🏠 Tenant
-              </button>
-              <button
-                onClick={() => { if (!isOwner) toggleOwner(); }}
-                className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 ${
-                  isOwner
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                🏢 PG Owner
-              </button>
-            </div>
-          </div>
 
           {/* Header */}
           <div className="text-center mb-8">

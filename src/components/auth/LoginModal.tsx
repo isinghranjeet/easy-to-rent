@@ -191,7 +191,7 @@ const LoginModal: React.FC<LoginModalProps> = ({
     setError(null);
     
     try {
-      const API_URL = 'http://localhost:10000';
+      const API_URL = 'https://easy-to-rent-backend.onrender.com';
       
       const response = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
