@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // src/services/api.ts
 
-const API_BASE_URL = 'https://eassy-to-rent-backend.onrender.com';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:10000';
 
 // ────────────────────── Types ──────────────────────
 export interface User {
@@ -94,7 +94,7 @@ export class ApiService {
   }
 
   // ── Generic request ──
-  private async request<T>(
+  public async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
@@ -111,12 +111,14 @@ export class ApiService {
     };
 
     const config: RequestInit = {
+      method: 'GET', // Default method
       ...options,
       headers,
       mode: 'cors',
     };
 
-    console.log(`🌐 [API_REQUEST] ${config.method} ${url}`);
+    const method = config.method;
+    console.log(`🌐 [API_REQUEST] ${method} ${url}`);
     if (isFormData) {
       console.log('📦 [API_REQUEST] Body is FormData');
       for (const [key, value] of (options.body as FormData).entries()) {
@@ -126,22 +128,34 @@ export class ApiService {
 
     try {
       const response = await fetch(url, config);
-      const data = await response.json();
+      
+      // Handle non-JSON responses or empty bodies
+      const contentType = response.headers.get('content-type');
+      let data: any = {};
+      
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        data = { message: text || 'No response body' };
+      }
 
       if (!response.ok) {
+        console.warn(`⚠️ [API_ERROR] ${response.status} ${response.statusText} for ${method} ${url}`);
         // Dispatch an unauthorized event for 401s
         if (response.status === 401) {
           this.clearToken();
           window.dispatchEvent(new Event('unauthorized'));
         }
-        const error: any = new Error(data.message || data.error || 'Request failed');
+        const error: any = new Error(data.message || data.error || `Request failed with status ${response.status}`);
+        error.status = response.status;
         error.errors = data.errors; // Capture detailed validation errors
         throw error;
       }
 
       return data as T;
-    } catch (error) {
-      console.error('API Request Error:', error);
+    } catch (error: any) {
+      console.error(`❌ [API_FAILURE] ${method} ${url}:`, error.message);
       throw error;
     }
   }

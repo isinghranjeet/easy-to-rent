@@ -48,12 +48,11 @@ const RoleGate = ({ children }: { children: React.ReactNode }) => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
+      <Toaster />
+      <Sonner />
       <AuthProvider>
         <WishlistProvider>
           <CompareProvider>
-            <Toaster />
-            <Sonner />
-
             <BrowserRouter>
               <Routes>
                 {/* ================= Public Routes (Tenant-Facing) ================= */}

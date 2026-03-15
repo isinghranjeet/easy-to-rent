@@ -9,9 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useCompare } from '@/contexts/CompareContext';
 import { toast } from 'sonner';
 import { transformPGData, TransformedPG } from '@/lib/utils/pgTransformer';
+import { api } from '@/services/api';
 
-// API URL
-const API_URL = 'https://eassy-to-rent-backend.onrender.com/api';
 
 const Compare = () => {
   const { compareList, removeFromCompare, clearCompare, maxCompareLimit } = useCompare();
@@ -36,10 +35,8 @@ const Compare = () => {
       // Fetch each PG by ID
       const fetchPromises = compareList.map(async (id) => {
         try {
-          const response = await fetch(`${API_URL}/pg/${id}`);
-          if (!response.ok) return null;
-          const result = await response.json();
-          return result.success ? result.data : null;
+          const result = await api.request<any>(`/api/pg/${id}`);
+          return result.success ? result.data : result;
         } catch (err) {
           console.error(`Error fetching PG ${id}:`, err);
           return null;

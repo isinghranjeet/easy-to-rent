@@ -1,12 +1,14 @@
-import { useState, useEffect, useMemo } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { PGCard } from '@/components/pg/PGCard';
 import { toast } from 'sonner';
 import { Loader2, AlertCircle, Search, Grid, List, RefreshCw, ChevronRight, ChevronLeft } from 'lucide-react';
+import { api } from '@/services/api';
 
-const API_URL = 'https://eassy-to-rent-backend.onrender.com/api';
+const PG_LIMIT = 6;
 
 interface PGListing {
   _id: string;
@@ -33,6 +35,10 @@ interface PGListing {
     type: string;
     coordinates: number[];
   };
+  wifi?: boolean;
+  meals?: boolean;
+  ac?: boolean;
+  parking?: boolean;
 }
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -79,72 +85,53 @@ const PGList = () => {
     setSearchParams(params);
   }, [searchQuery, selectedLocation, selectedType, setSearchParams]);
 
-  useEffect(() => {
-    fetchListings(1);
-  }, [selectedLocation, selectedType, sortBy, debouncedSearch]);
-
-  useEffect(() => {
-    fetchListings(1);
-  }, []);
-
-  const fetchListings = async (page = 1) => {
+  const fetchListings = useCallback(async (page = 1) => {
     try {
       setLoading(true);
       setError(null);
       
-      const url = new URL(`${API_URL}/pg`);
-      url.searchParams.append('page', page.toString());
-      url.searchParams.append('limit', '3'); // Changed to 3 items per page
+      const params: any = {
+        page: page.toString(),
+        limit: PG_LIMIT.toString()
+      };
       
       if (selectedType !== 'all') {
-        url.searchParams.append('type', selectedType);
+        params.type = selectedType;
       }
       if (selectedLocation !== 'all') {
-        url.searchParams.append('city', selectedLocation);
+        params.city = selectedLocation;
       }
       if (debouncedSearch) {
-        url.searchParams.append('search', debouncedSearch);
+        params.search = debouncedSearch;
       }
       
       switch (sortBy) {
         case 'price_asc':
-          url.searchParams.append('sort', 'price');
-          url.searchParams.append('order', 'asc');
+          params.sort = 'price';
+          params.order = 'asc';
           break;
         case 'price_desc':
-          url.searchParams.append('sort', 'price');
-          url.searchParams.append('order', 'desc');
+          params.sort = 'price';
+          params.order = 'desc';
           break;
         case 'rating':
-          url.searchParams.append('sort', 'rating');
-          url.searchParams.append('order', 'desc');
+          params.sort = 'rating';
+          params.order = 'desc';
           break;
         case 'newest':
-          url.searchParams.append('sort', 'createdAt');
-          url.searchParams.append('order', 'desc');
+          params.sort = 'createdAt';
+          params.order = 'desc';
           break;
       }
+
+      const queryString = new URLSearchParams(params).toString();
+      const result = await api.request<any>(`/api/pg?${queryString}`);
       
-      const response = await fetch(url.toString(), {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch listings`);
-      }
-      
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.message || 'Failed to load listings');
-      }
-      
-      const listingsData = result.data?.items || result.data || [];
-      const newTotalCount = result.data?.total || listingsData.length;
-      const newTotalPages = result.data?.pages || Math.ceil(newTotalCount / 3) || 1;
+      // Handle cases where the whole result might be the array itself
+      const responseData = result.success ? (result.data || []) : result;
+      const listingsData = responseData.items || (Array.isArray(responseData) ? responseData : []);
+      const newTotalCount = responseData.total || listingsData.length;
+      const newTotalPages = responseData.pages || Math.ceil(newTotalCount / PG_LIMIT) || 1;
       
       setTotalCount(newTotalCount);
       setTotalPages(newTotalPages);
@@ -161,6 +148,11 @@ const PGList = () => {
       
       setListings(publishedListings);
       
+      // If we got here and it was ostensibly successful but empty, that's fine
+      if (publishedListings.length === 0 && page === 1) {
+        // No error, just empty
+      }
+      
     } catch (err: any) {
       setError('Unable to load listings. Please try again.');
       toast.error('Failed to load PG listings');
@@ -168,7 +160,11 @@ const PGList = () => {
       setLoading(false);
       setLoadingMore(false);
     }
-  };
+  }, [selectedType, selectedLocation, debouncedSearch, sortBy]);
+
+  useEffect(() => {
+    fetchListings(1);
+  }, [fetchListings]);
 
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages) {

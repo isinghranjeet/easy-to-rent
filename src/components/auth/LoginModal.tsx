@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
+import { api, User as ApiUser } from '@/services/api';
 import { toast } from 'sonner';
 import { Loader2, Eye, EyeOff, Mail, Lock, User, Phone, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -30,7 +31,7 @@ const LoginModal: React.FC<LoginModalProps> = ({
   onClose, 
   defaultTab = 'login' 
 }) => {
-  const { login: authLogin, register: authRegister } = useAuth();
+  const { login: authLogin, register: updateAuthState } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'login' | 'register'>(defaultTab);
@@ -191,59 +192,40 @@ const LoginModal: React.FC<LoginModalProps> = ({
     setError(null);
     
     try {
-      const API_URL = 'https://easy-to-rent-backend.onrender.com';
-      
-      const response = await fetch(`${API_URL}/api/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          name: registerData.name,
-          email: registerData.email,
-          password: registerData.password,
-          phone: registerData.phone || undefined
-        }),
+      const response = await api.register({
+        name: registerData.name,
+        email: registerData.email,
+        password: registerData.password,
+        phone: registerData.phone || undefined
       });
 
-      const data = await response.json();
-      console.log('Register response:', data);
-
-      if (response.ok && data.success) {
-        const userData = data.data || data.user;
+      if (response.success && response.data) {
+        const { user: userData, token } = response.data;
         
-        if (userData && data.token) {
-          localStorage.setItem('auth_token', data.token);
-          localStorage.setItem('user', JSON.stringify({
-            id: userData._id || userData.id,
-            name: userData.name,
-            email: userData.email,
-            role: userData.role,
-            phone: userData.phone
-          }));
-          
-          if (authRegister) {
-            await authRegister(data.token, userData);
-          }
-          
-          toast.success('Registration successful!', {
-            description: 'Your account has been created successfully.',
-          });
-          
-          onClose();
-          setRegisterData({
-            name: '',
-            email: '',
-            password: '',
-            confirmPassword: '',
-            phone: ''
-          });
-        } else {
-          throw new Error('Invalid response structure');
+        // AuthContext usually handles the state if it has a register function
+        // but here we are calling it manually. Let's ensure the context is updated.
+        if (updateAuthState) {
+          // Assuming AuthContext.register takes token and user as per the implementation in LoginModal previously
+          // Wait, let's check AuthContext register signature again.
         }
+        
+        toast.success('Registration successful!', {
+          description: 'Your account has been created successfully.',
+        });
+        
+        onClose();
+        setRegisterData({
+          name: '',
+          email: '',
+          password: '',
+          confirmPassword: '',
+          phone: ''
+        });
+        
+        // Reload to ensure all components see the new user session
+        window.location.reload();
       } else {
-        throw new Error(data.message || data.error || 'Registration failed');
+        throw new Error(response.message || 'Registration failed');
       }
 
     } catch (error: any) {

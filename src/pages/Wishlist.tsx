@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/pages/Wishlist.tsx
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -11,7 +12,6 @@ import { toast } from 'sonner';
 import { transformPGData, TransformedPG } from '@/lib/utils/pgTransformer';
 import { api } from '@/services/api';
 
-const API_URL = 'https://eassy-to-rent-backend.onrender.com/api';
 
 const Wishlist = () => {
   const { wishlist, toggleWishlist, clearWishlist } = useWishlist();
@@ -47,23 +47,8 @@ const Wishlist = () => {
       try {
         const fetchPromises = wishlist.map(async (id) => {
           try {
-            const response = await fetch(`${API_URL}/pg/${id}`, {
-              headers: {
-                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-                'Content-Type': 'application/json',
-              }
-            });
-            
-            if (response.status === 401) {
-              // Token expired
-              localStorage.removeItem('auth_token');
-              window.location.href = '/login';
-              return null;
-            }
-            
-            if (!response.ok) return null;
-            const result = await response.json();
-            return result.success ? result.data : null;
+            const result = await api.request<any>(`/api/pg/${id}`);
+            return result.success ? result.data : result; // Handle both wrapper and direct object
           } catch (err) {
             console.error(`Error fetching PG ${id}:`, err);
             return null;
@@ -104,14 +89,19 @@ const Wishlist = () => {
       id: id,
       name: `Sample PG ${index + 1}`,
       address: '123 Sample Street, City',
+      city: 'Chandigarh',
       price: 5000 + (index * 1000),
       rating: 4.5,
+      reviewCount: 50 + (index * 10),
       images: ['https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af'],
       amenities: ['WiFi', 'Parking', 'Food'],
       type: index % 2 === 0 ? 'boys' : 'girls',
       description: 'This is a sample PG property for demonstration.',
       distance: `${1 + index} km`,
-      reviews: 50 + (index * 10)
+      reviews: 50 + (index * 10),
+      createdAt: new Date().toISOString(),
+      verified: true,
+      featured: false
     }));
   };
 

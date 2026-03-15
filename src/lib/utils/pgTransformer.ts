@@ -25,7 +25,7 @@ export interface RawPGData {
     type: string;
     coordinates: number[];
   };
-  published?: boolean;
+  slug?: string;
 }
 
 export interface TransformedPG {

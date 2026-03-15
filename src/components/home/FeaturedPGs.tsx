@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Star, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PGCard } from '@/components/pg/PGCard';
+import { api } from '@/services/api';
+import { RawPGData, transformPGData } from '@/lib/utils/pgTransformer';
 
-const API_URL = 'https://eassy-to-rent-backend.onrender.com';
+
 
 interface PGListing {
   _id: string;
@@ -51,36 +53,25 @@ export function FeaturedPGs() {
       setLoading(true);
       setError('');
       
-      const response = await fetch(`${API_URL}/api/pg?limit=20`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        mode: 'cors'
-      });
+      const result = await api.request<{ success: boolean; data?: { items: RawPGData[] } | RawPGData[]; items?: RawPGData[]; message?: string }>('/api/pg?limit=20');
       
-      if (!response.ok) {
-        throw new Error(`Failed to fetch listings`);
-      }
-      
-      const result = await response.json();
-      
-      let pgs: PGListing[] = [];
+      let rawPgs: RawPGData[] = [];
       
       if (result.success) {
         if (result.data?.items && Array.isArray(result.data.items)) {
-          pgs = result.data.items;
+          rawPgs = result.data.items;
         }
         else if (Array.isArray(result.data)) {
-          pgs = result.data;
+          rawPgs = result.data;
         }
         else if (Array.isArray(result.items)) {
-          pgs = result.items;
+          rawPgs = result.items;
         }
       } else {
         throw new Error(result.message || 'Failed to fetch PGs');
       }
+
+      const pgs: PGListing[] = rawPgs.map(transformPGData);
       
       const publishedPGs = pgs.filter(pg => pg.published !== false);
       
@@ -235,17 +226,19 @@ export function FeaturedPGs() {
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {displayedPGs.map((pg, index) => (
-                <div key={pg._id || pg.id || index} className="relative">
-                  {pg.featured && (
-                    <div className="absolute top-3 left-3 z-10">
-                      <div className="inline-flex items-center gap-1 px-3 py-1 bg-orange-500 text-white text-xs font-semibold rounded-full shadow-sm">
-                        <Star className="h-3 w-3 fill-white" />
-                        Featured
+                <Link key={pg._id || pg.id || index} to={`/pg/${pg._id || pg.id}`} className="w-full">
+                  <div className="relative">
+                    {pg.featured && (
+                      <div className="absolute top-3 left-3 z-10">
+                        <div className="inline-flex items-center gap-1 px-3 py-1 bg-orange-500 text-white text-xs font-semibold rounded-full shadow-sm">
+                          <Star className="h-3 w-3 fill-white" />
+                          Featured
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  <PGCard pg={transformForPGCard(pg)} index={index} />
-                </div>
+                    )}
+                    <PGCard pg={transformForPGCard(pg)} index={index} />
+                  </div>
+                </Link>
               ))}
             </div>
           </>

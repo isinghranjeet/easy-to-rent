@@ -1,6 +1,7 @@
 // src/components/debug/BackendTester.tsx
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2 } from 'lucide-react';
@@ -13,7 +14,7 @@ const BackendTester = () => {
     password: 'test123'
   });
 
-  const BASE_URL = 'https://eassy-to-rent-backend.onrender.com';
+  const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:10000';
 
   const endpoints = [
     { path: '/', method: 'GET', description: 'Root endpoint' },

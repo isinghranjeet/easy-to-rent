@@ -33,27 +33,29 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
 interface BackendPG {
-  id: string;
+  _id?: string;
+  id?: string;
   name: string;
-  slug: string;
-  description: string;
+  slug?: string;
+  description?: string;
+  city?: string;
+  locality?: string;
+  address?: string;
   price: number;
   images: string[];
   gallery?: string[];
-  city: string;
-  locality: string;
-  type: 'boys' | 'girls' | 'co-ed' | 'family';
-  amenities: string[];
-  rating: number;
-  reviewCount: number;
+  type?: 'boys' | 'girls' | 'co-ed' | 'family';
+  amenities?: string[];
+  rating?: number;
+  reviewCount?: number;
   ownerName?: string;
   ownerPhone?: string;
-  featured: boolean;
-  verified: boolean;
-  wifi: boolean;
-  meals: boolean;
-  ac: boolean;
-  parking: boolean;
+  featured?: boolean;
+  verified?: boolean;
+  wifi?: boolean;
+  meals?: boolean;
+  ac?: boolean;
+  parking?: boolean;
   distance?: string;
   availableRooms?: number;
   minStay?: string;
@@ -80,6 +82,8 @@ export const PGCard = memo(({ pg, index = 0, variant = 'default' }: PGCardProps)
   const { isAuthenticated } = useAuth();
   const { isInWishlist, toggleWishlist } = useWishlist();
   const { isInCompare, toggleCompare } = useCompare();
+
+  const pgId = pg.id || pg._id || '';
 
   const allImages = [...(pg.images || []), ...(pg.gallery || [])].filter(Boolean);
   const displayImages = allImages.length > 0 ? allImages : [FALLBACK_IMAGE];
@@ -128,17 +132,17 @@ Regards,
     }
     
     if (action === 'wishlist') {
-      toggleWishlist(pg.id);
+      toggleWishlist(pgId);
       toast({
-        title: isInWishlist(pg.id) ? "Removed from Wishlist" : "Added to Wishlist",
-        description: isInWishlist(pg.id) ? `${pg.name} has been removed` : `${pg.name} has been saved`,
+        title: isInWishlist(pgId) ? "Removed from Wishlist" : "Added to Wishlist",
+        description: isInWishlist(pgId) ? `${pg.name} has been removed` : `${pg.name} has been saved`,
         duration: 2000,
       });
     } else {
-      toggleCompare(pg.id);
+      toggleCompare(pgId);
       toast({
-        title: isInCompare(pg.id) ? "Removed from Compare" : "Added to Compare",
-        description: isInCompare(pg.id) ? `Removed from comparison` : `Ready to compare`,
+        title: isInCompare(pgId) ? "Removed from Compare" : "Added to Compare",
+        description: isInCompare(pgId) ? `Removed from comparison` : `Ready to compare`,
         duration: 2000,
       });
     }
@@ -156,9 +160,9 @@ Regards,
 
   const handleSuccess = () => {
     if (pendingAction === 'wishlist') {
-      toggleWishlist(pg.id);
+      toggleWishlist(pgId);
     } else if (pendingAction === 'compare') {
-      toggleCompare(pg.id);
+      toggleCompare(pgId);
     }
     setPendingAction(null);
   };
@@ -223,7 +227,7 @@ Regards,
           {/* Type Badge */}
           <div className="absolute right-2 top-2">
             <Badge variant="secondary" className="border-0 bg-white/95 px-2 py-0.5 text-[10px] font-medium text-gray-700 shadow-sm backdrop-blur">
-              {getTypeLabel(pg.type)}
+              {getTypeLabel(pg.type || 'co-ed')}
             </Badge>
           </div>
 
@@ -337,7 +341,7 @@ Regards,
           </div>
 
           {/* Property Name */}
-          <Link to={`/pg/${pg.slug}`} onClick={(e) => e.stopPropagation()}>
+          <Link to={`/pg/${pg._id || pg.id}`} className="block" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-1 text-sm font-semibold leading-tight text-foreground hover:text-primary transition-colors line-clamp-1">
               {pg.name}
             </h3>

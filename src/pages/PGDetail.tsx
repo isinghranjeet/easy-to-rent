@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
   ArrowLeft, MapPin, Star, Heart, Share2, Phone, 
@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
+import { api } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -88,8 +89,6 @@ const PGDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const API_URL = import.meta.env.VITE_API_URL || "https://eassy-to-rent-backend.onrender.com";
-
   useEffect(() => {
     if (!id) {
       setError("No PG ID provided");
@@ -102,25 +101,18 @@ const PGDetail = () => {
         setLoading(true);
         setError(null);
 
-        const res = await fetch(`${API_URL}/api/pg/${id}`);
+        const data = await api.request<any>(`/api/pg/${id}`);
         
-        if (!res.ok) {
-          throw new Error(`Failed to fetch PG: ${res.status}`);
-        }
-        
-        const data = await res.json();
-
         if (data?.data) {
           setPg(data.data);
+        } else if (data?.success === false) {
+           throw new Error(data.message || "Failed to load PG");
         } else {
-          throw new Error("PG data not found in response");
+          setPg(data); // In case the response is the PG object itself
         }
       } catch (error) {
         console.error("Error fetching PG:", error);
         setError(error instanceof Error ? error.message : "Failed to load PG details");
-        
-        // Fallback to mock data if API fails
-        loadMockData();
       } finally {
         setLoading(false);
       }
@@ -144,38 +136,6 @@ const PGDetail = () => {
       setIsFavorite(favorites.includes(pg._id));
     }
   }, [pg, bookingMonths]);
-
-  const loadMockData = () => {
-    const mockPG: PGListing = {
-      _id: id || 'mock-id-123',
-      name: 'Premium CU PG Accommodation',
-      description: 'Luxurious PG accommodation located near Chandigarh University Gate 1. Features spacious rooms, high-speed WiFi, nutritious meals, and 24/7 security. Perfect for students looking for a comfortable and safe living environment.',
-      city: 'Chandigarh',
-      address: 'Gate 1, Chandigarh University Road, Gharuan, Punjab',
-      price: 8500,
-      type: 'co-ed',
-      images: [
-        'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&auto=format&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1560185127-6ed189bf02f4?w=800&auto=format&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=800&auto=format&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&auto=format&fit=crop&q=80'
-      ],
-      amenities: ['WiFi', 'AC', 'Meals', 'Parking', 'CCTV', 'Power Backup', 'Laundry', 'Hot Water', 'Study Room'],
-      verified: true,
-      featured: true,
-      rating: 4.5,
-      reviewCount: 128,
-      ownerName: 'Mr. Rajesh Kumar',
-      ownerPhone: '9315058665',
-      ownerEmail: 'rajesh.cupg@gmail.com',
-      createdAt: new Date().toISOString(),
-      distance: '500m from CU Gate 1',
-      locality: 'Gate 1 Area',
-      roomTypes: ['Single', 'Double', 'Triple']
-    };
-    
-    setPg(mockPG);
-  };
 
   const handleFavorite = () => {
     if (!pg) return;
