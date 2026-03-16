@@ -8,7 +8,8 @@ import { toast } from 'sonner';
 import { Loader2, AlertCircle, Search, Grid, List, RefreshCw, ChevronRight, ChevronLeft } from 'lucide-react';
 import { api } from '@/services/api';
 
-const PG_LIMIT = 6;
+// Show only 3 cards per page
+const PG_LIMIT = 3;
 
 interface PGListing {
   _id: string;
@@ -216,7 +217,7 @@ const PGList = () => {
     fetchListings(1);
   };
 
-  // Generate page numbers for pagination
+  // Generate page numbers for pagination with elegant styling
   const getPageNumbers = () => {
     const pages = [];
     const maxVisiblePages = 5;
@@ -398,13 +399,13 @@ const PGList = () => {
               ))}
             </div>
 
-            {/* Pagination */}
+            {/* Pagination with 1,2,3,... styling - No "Showing" text */}
             {totalPages > 1 && (
-              <div className="mt-8 flex justify-center items-center gap-2">
+              <div className="mt-12 flex justify-center items-center gap-2">
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className="p-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 text-gray-600 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-gray-300 disabled:hover:text-gray-600 transition-all"
                   aria-label="Previous page"
                 >
                   <ChevronLeft className="h-5 w-5" />
@@ -412,15 +413,17 @@ const PGList = () => {
                 
                 {getPageNumbers().map((page, index) => (
                   page === -1 ? (
-                    <span key={`ellipsis-${index}`} className="px-3 py-2 text-gray-400">...</span>
+                    <span key={`ellipsis-${index}`} className="w-10 h-10 flex items-center justify-center text-gray-500 font-medium">
+                      ...
+                    </span>
                   ) : (
                     <button
                       key={page}
                       onClick={() => handlePageChange(page)}
-                      className={`min-w-[40px] h-10 rounded-lg transition-colors ${
+                      className={`flex items-center justify-center w-10 h-10 rounded-lg font-medium transition-all ${
                         currentPage === page
-                          ? 'bg-orange-500 text-white'
-                          : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                          ? 'bg-orange-500 text-white shadow-md shadow-orange-200 scale-105'
+                          : 'border border-gray-300 text-gray-700 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-600'
                       }`}
                     >
                       {page}
@@ -431,7 +434,7 @@ const PGList = () => {
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
-                  className="p-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 text-gray-600 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-gray-300 disabled:hover:text-gray-600 transition-all"
                   aria-label="Next page"
                 >
                   <ChevronRight className="h-5 w-5" />

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
   ArrowLeft, MapPin, Star, Heart, Share2, Phone, 
@@ -19,6 +19,7 @@ import { Slider } from '@/components/ui/slider';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useWishlist } from '@/contexts/WishlistContext';
 
 const amenityIcons: Record<string, React.ElementType> = {
   'WiFi': Wifi,
@@ -62,11 +63,11 @@ interface PGListing {
   published?: boolean;
   locality?: string;
   roomTypes?: string[];
+  slug?: string;
 }
 
 const PGDetail = () => {
-  const { slug } = useParams();
-  const id = slug || "";
+  const { slug } = useParams<{ slug: string }>();
   const [currentImage, setCurrentImage] = useState(0);
   const [showGallery, setShowGallery] = useState(false);
   const [selectedTab, setSelectedTab] = useState('overview');
@@ -82,16 +83,17 @@ const PGDetail = () => {
   });
   const [calculatedPrice, setCalculatedPrice] = useState(0);
   const [totalSavings, setTotalSavings] = useState(0);
-  const [availabilityPercentage, setAvailabilityPercentage] = useState(0);
-  const [isFavorite, setIsFavorite] = useState(false);
   
   const [pg, setPg] = useState<PGListing | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Use the wishlist context
+  const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
 
   useEffect(() => {
-    if (!id) {
-      setError("No PG ID provided");
+    if (!slug) {
+      setError("No PG identifier provided");
       setLoading(false);
       return;
     }
@@ -101,14 +103,37 @@ const PGDetail = () => {
         setLoading(true);
         setError(null);
 
-        const data = await api.request<any>(`/api/pg/${id}`);
+        let response;
         
-        if (data?.data) {
-          setPg(data.data);
-        } else if (data?.success === false) {
-           throw new Error(data.message || "Failed to load PG");
+        // Method 1: Try fetching by slug first (this is what we want for SEO-friendly URLs)
+        try {
+          console.log('Attempting to fetch by slug:', slug);
+          response = await api.request<any>(`/api/pg/slug/${slug}`);
+          console.log('Found by slug:', response);
+        } catch (slugError) {
+          console.log('Not found by slug, trying as ID...', slugError);
+          
+          // Method 2: If slug fails, try as ID (for backward compatibility)
+          // But only if it looks like a valid ObjectId (24 character hex)
+          if (slug.match(/^[0-9a-fA-F]{24}$/)) {
+            response = await api.request<any>(`/api/pg/${slug}`);
+            console.log('Found by ID:', response);
+          } else {
+            // If it's not a valid ObjectId either, rethrow the error
+            throw new Error('PG not found');
+          }
+        }
+        
+        // Handle the response - your API might return data in different formats
+        if (response?.data) {
+          setPg(response.data);
+        } else if (response?.success === false) {
+          throw new Error(response.message || "Failed to load PG");
+        } else if (response) {
+          // If the response is directly the PG object
+          setPg(response);
         } else {
-          setPg(data); // In case the response is the PG object itself
+          throw new Error("No data received from server");
         }
       } catch (error) {
         console.error("Error fetching PG:", error);
@@ -119,7 +144,7 @@ const PGDetail = () => {
     };
 
     fetchPG();
-  }, [id]);
+  }, [slug]);
   
   useEffect(() => {
     if (pg) {
@@ -128,29 +153,28 @@ const PGDetail = () => {
       const calculated = basePrice * bookingMonths * ((100 - discount) / 100);
       setCalculatedPrice(Math.round(calculated));
       setTotalSavings(basePrice * bookingMonths - calculated);
-      
-      const availability = Math.min(100, Math.max(10, Math.random() * 100));
-      setAvailabilityPercentage(availability);
-      
-      const favorites = JSON.parse(localStorage.getItem('pgFavorites') || '[]');
-      setIsFavorite(favorites.includes(pg._id));
     }
   }, [pg, bookingMonths]);
 
   const handleFavorite = () => {
     if (!pg) return;
     
-    const favorites = JSON.parse(localStorage.getItem('pgFavorites') || '[]');
-    if (isFavorite) {
-      const newFavorites = favorites.filter((favId: string) => favId !== pg._id);
-      localStorage.setItem('pgFavorites', JSON.stringify(newFavorites));
-      setIsFavorite(false);
-      toast.success('Removed from favorites');
+    // Check if already in wishlist
+    if (isInWishlist(pg._id)) {
+      removeFromWishlist(pg._id);
+      toast.success('Removed from wishlist');
     } else {
-      favorites.push(pg._id);
-      localStorage.setItem('pgFavorites', JSON.stringify(favorites));
-      setIsFavorite(true);
-      toast.success('Added to favorites');
+      // Add to wishlist with all details
+      addToWishlist({
+        _id: pg._id,
+        name: pg.name,
+        price: pg.price,
+        images: pg.images,
+        type: pg.type,
+        city: pg.city,
+        rating: pg.rating
+      });
+      toast.success('Added to wishlist');
     }
   };
 
@@ -174,7 +198,7 @@ const PGDetail = () => {
     
     const phoneNumber = pg.ownerPhone?.replace(/\D/g, '') || '9315058665';
     const message = encodeURIComponent(
-      `Hello ${pg.ownerName},\n\nI'm interested in your PG:\n` +
+      `Hello ${pg.ownerName || 'Owner'},\n\nI'm interested in your PG:\n` +
       `• Name: ${pg.name}\n` +
       `• Location: ${pg.address}\n` +
       `• Price: ₹${pg.price}/month\n\n` +
@@ -187,7 +211,6 @@ const PGDetail = () => {
     if (!pg) return;
     
     toast.success('Brochure downloaded!');
-    // Simulate download
     const link = document.createElement('a');
     link.href = '#';
     link.download = `${pg.name.replace(/\s+/g, '_')}_Brochure.pdf`;
@@ -229,6 +252,67 @@ const PGDetail = () => {
   const handleContactOwner = () => {
     setShowContactForm(true);
   };
+
+  // Mock data for reviews
+  const reviews = [
+    {
+      id: 1,
+      name: 'Rahul Sharma',
+      rating: 5,
+      date: '2 weeks ago',
+      comment: 'Excellent PG with great amenities. The owner is very cooperative and the food quality is amazing. Highly recommended for CU students!',
+      verified: true,
+      program: 'B.Tech CSE, CU'
+    },
+    {
+      id: 2,
+      name: 'Priya Patel',
+      rating: 4,
+      date: '1 month ago',
+      comment: 'Good location near Gate 1 and food quality. Could be cleaner in common areas, but overall a comfortable stay.',
+      verified: true,
+      program: 'MBA, CU'
+    },
+    {
+      id: 3,
+      name: 'Amit Kumar',
+      rating: 4.5,
+      date: '3 months ago',
+      comment: 'Great value for money. The WiFi is fast and the study room is very useful during exams. Close to university.',
+      verified: true,
+      program: 'CA Student'
+    },
+  ];
+
+  const roomDetails = pg?.roomTypes?.map((type, index) => ({
+    type,
+    price: pg.price * (index === 0 ? 1 : index === 1 ? 0.7 : 0.5),
+    size: index === 0 ? '120 sq ft' : index === 1 ? '180 sq ft' : '220 sq ft',
+    available: Math.floor(Math.random() * 5) + 1,
+    description: `${type} occupancy room with basic amenities`
+  })) || (pg ? [
+    { 
+      type: 'Single Occupancy', 
+      price: pg.price, 
+      size: '120 sq ft', 
+      available: 3,
+      description: 'Private room with attached bathroom, study table, and wardrobe'
+    },
+    { 
+      type: 'Double Occupancy', 
+      price: pg.price * 0.7, 
+      size: '180 sq ft', 
+      available: 5,
+      description: 'Shared room for 2 people with separate beds and storage'
+    },
+    { 
+      type: 'Triple Occupancy', 
+      price: pg.price * 0.5, 
+      size: '220 sq ft', 
+      available: 2,
+      description: 'Shared room for 3 people, economical option'
+    },
+  ] : []);
 
   // Loading state
   if (loading) {
@@ -283,67 +367,6 @@ const PGDetail = () => {
     );
   }
 
-  // Mock data for reviews (these can remain as fallbacks)
-  const reviews = [
-    {
-      id: 1,
-      name: 'Rahul Sharma',
-      rating: 5,
-      date: '2 weeks ago',
-      comment: 'Excellent PG with great amenities. The owner is very cooperative and the food quality is amazing. Highly recommended for CU students!',
-      verified: true,
-      program: 'B.Tech CSE, CU'
-    },
-    {
-      id: 2,
-      name: 'Priya Patel',
-      rating: 4,
-      date: '1 month ago',
-      comment: 'Good location near Gate 1 and food quality. Could be cleaner in common areas, but overall a comfortable stay.',
-      verified: true,
-      program: 'MBA, CU'
-    },
-    {
-      id: 3,
-      name: 'Amit Kumar',
-      rating: 4.5,
-      date: '3 months ago',
-      comment: 'Great value for money. The WiFi is fast and the study room is very useful during exams. Close to university.',
-      verified: true,
-      program: 'CA Student'
-    },
-  ];
-
-  const roomDetails = pg.roomTypes?.map((type, index) => ({
-    type,
-    price: pg.price * (index === 0 ? 1 : index === 1 ? 0.7 : 0.5),
-    size: index === 0 ? '120 sq ft' : index === 1 ? '180 sq ft' : '220 sq ft',
-    available: Math.floor(Math.random() * 5) + 1,
-    description: `${type} occupancy room with basic amenities`
-  })) || [
-    { 
-      type: 'Single Occupancy', 
-      price: pg.price, 
-      size: '120 sq ft', 
-      available: 3,
-      description: 'Private room with attached bathroom, study table, and wardrobe'
-    },
-    { 
-      type: 'Double Occupancy', 
-      price: pg.price * 0.7, 
-      size: '180 sq ft', 
-      available: 5,
-      description: 'Shared room for 2 people with separate beds and storage'
-    },
-    { 
-      type: 'Triple Occupancy', 
-      price: pg.price * 0.5, 
-      size: '220 sq ft', 
-      available: 2,
-      description: 'Shared room for 3 people, economical option'
-    },
-  ];
-
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-white to-orange-50/50">
       <Navbar />
@@ -354,13 +377,13 @@ const PGDetail = () => {
           onClick={handleFavorite}
           className={cn(
             "w-12 h-12 rounded-full shadow-lg border flex items-center justify-center hover:scale-110 transition-all",
-            isFavorite
+            isInWishlist(pg._id)
               ? "bg-red-50 border-red-200 text-red-500 hover:bg-red-100"
               : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
           )}
-          title={isFavorite ? "Remove from favorites" : "Add to favorites"}
+          title={isInWishlist(pg._id) ? "Remove from favorites" : "Add to favorites"}
         >
-          <Heart className={cn("h-5 w-5", isFavorite && "fill-current")} />
+          <Heart className={cn("h-5 w-5", isInWishlist(pg._id) && "fill-current")} />
         </button>
         
         <button
@@ -406,7 +429,7 @@ const PGDetail = () => {
               onClick={() => setShowGallery(true)}
             >
               <img
-                src={pg.images[0]}
+                src={pg.images[0] || '/placeholder-image.jpg'}
                 alt={pg.name}
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
@@ -424,7 +447,7 @@ const PGDetail = () => {
                 }}
               >
                 <img
-                  src={image}
+                  src={image || '/placeholder-image.jpg'}
                   alt={`${pg.name} ${index + 2}`}
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
@@ -452,7 +475,7 @@ const PGDetail = () => {
             
             <div className="relative">
               <img
-                src={pg.images[currentImage]}
+                src={pg.images[currentImage] || '/placeholder-image.jpg'}
                 alt={`${pg.name} ${currentImage + 1}`}
                 className="max-h-[80vh] max-w-[90vw] object-contain rounded-xl"
               />
@@ -605,7 +628,7 @@ const PGDetail = () => {
                         <div 
                           key={index}
                           className={cn(
-                            "border rounded-xl p-4 transition-all",
+                            "border rounded-xl p-4 transition-all cursor-pointer",
                             selectedRoom === index 
                               ? "border-orange-500 bg-orange-50" 
                               : "border-gray-200 hover:border-orange-300"
@@ -713,6 +736,42 @@ const PGDetail = () => {
                   </div>
                 </TabsContent>
               </Tabs>
+
+              {/* Reviews Section */}
+              <div className="bg-white rounded-xl p-6 border">
+                <h2 className="text-xl font-bold text-gray-900 mb-6">Reviews</h2>
+                <div className="space-y-6">
+                  {reviews.map((review) => (
+                    <div key={review.id} className="border-b last:border-0 pb-6 last:pb-0">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+                            <Users className="h-5 w-5 text-orange-600" />
+                          </div>
+                          <div>
+                            <p className="font-bold text-gray-900">{review.name}</p>
+                            <p className="text-sm text-gray-600">{review.program}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center">
+                            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                            <span className="ml-1 font-bold text-gray-900">{review.rating}</span>
+                          </div>
+                          <span className="text-sm text-gray-600">{review.date}</span>
+                        </div>
+                      </div>
+                      <p className="text-gray-700 ml-13">{review.comment}</p>
+                      {review.verified && (
+                        <div className="flex items-center gap-1 mt-2 text-green-600 text-sm">
+                          <BadgeCheck className="h-4 w-4" />
+                          <span>Verified Student</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
 
             {/* Right Column - Booking & Contact */}
@@ -895,6 +954,19 @@ const PGDetail = () => {
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={contactData.email}
+                    onChange={(e) => setContactData(prev => ({ ...prev, email: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-orange-500 outline-none"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Message
                   </label>
                   <textarea
@@ -903,6 +975,18 @@ const PGDetail = () => {
                     rows={3}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-orange-500 outline-none"
                     placeholder="I'm interested in this PG..."
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Preferred Visit Date
+                  </label>
+                  <input
+                    type="date"
+                    value={contactData.visitDate}
+                    onChange={(e) => setContactData(prev => ({ ...prev, visitDate: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-orange-500 outline-none"
                   />
                 </div>
                 
