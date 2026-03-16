@@ -45,10 +45,7 @@ export function Navbar() {
 
   const navLinks = [
     { href: "/", label: "Home", icon: <Home className="h-4 w-4" /> },
-    { href: "/pg", label: "Find PG", icon: <Search className="h-4 w-4" /> },
-    { href: "/about", label: "About", icon: <Star className="h-4 w-4" /> },
-    { href: "/contact", label: "Contact", icon: <MapPin className="h-4 w-4" /> },
-    { href: "/faq", label: "FAQ", icon: <Shield className="h-4 w-4" /> }
+    { href: "/pg", label: "Find PG", icon: <Search className="h-4 w-4" /> }
   ];
 
   const isActive = (path: string) => location.pathname === path;

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // src/services/api.ts
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:10000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://eassy-to-rent-backend.onrender.com';
 
 // ────────────────────── Types ──────────────────────
 export interface User {
