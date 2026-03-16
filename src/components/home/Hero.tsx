@@ -155,13 +155,6 @@ export function Hero() {
 
           </div>
 
-          {/* Stats Section (Optional) */}
-          {!loadingLocations && locations.length > 0 && (
-            <div className="mt-6 text-white/80 text-sm">
-              <span className="font-semibold text-white">{locations.length}+</span> locations available
-            </div>
-          )}
-
         </div>
 
       </div>
