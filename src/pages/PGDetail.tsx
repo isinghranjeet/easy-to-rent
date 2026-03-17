@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
-  ArrowLeft, MapPin, Star, Heart, Share2, Phone, 
+  ArrowLeft, MapPin, Star, Phone, MessageCircle, Navigation, Route,
   Wifi, Utensils, Wind, Car, Shield, Zap, Dumbbell, BookOpen,
   Check, ChevronLeft, ChevronRight, X, Calendar, Clock, Users,
-  Download, MessageCircle, Navigation,
-  TrendingUp, Home, Mail, PhoneCall, Crown,
-  BadgeCheck, Users as UsersIcon, Building, Route,
+  TrendingUp, Home, Crown,
+  BadgeCheck, Users as UsersIcon, Building,
   Bus, Train, Coffee, ShoppingBag, Hospital, School, Landmark
 } from 'lucide-react';
 import { Navbar } from '@/components/layout/Navbar';
@@ -19,7 +18,6 @@ import { Slider } from '@/components/ui/slider';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { useWishlist } from '@/contexts/WishlistContext';
 
 const amenityIcons: Record<string, React.ElementType> = {
   'WiFi': Wifi,
@@ -33,13 +31,27 @@ const amenityIcons: Record<string, React.ElementType> = {
   'Laundry': Shield,
   '24/7 Security': Shield,
   'Hot Water': Utensils,
-  'TV': MessageCircle,
+  'TV': Home,
   'Refrigerator': Home,
   'Geyser': Zap,
   'Cooking': Utensils,
   'Water Purifier': Utensils,
   'Housekeeping': Shield,
 };
+
+interface Location {
+  type: string;
+  coordinates: number[];
+  address: string;
+  placeId?: string;
+}
+
+interface NearbyPlace {
+  name: string;
+  type: string;
+  distance: string;
+  duration?: string;
+}
 
 interface PGListing {
   _id: string;
@@ -64,6 +76,8 @@ interface PGListing {
   locality?: string;
   roomTypes?: string[];
   slug?: string;
+  location?: Location;
+  nearbyPlaces?: NearbyPlace[];
 }
 
 const PGDetail = () => {
@@ -73,13 +87,13 @@ const PGDetail = () => {
   const [selectedTab, setSelectedTab] = useState('overview');
   const [selectedRoom, setSelectedRoom] = useState(0);
   const [bookingMonths, setBookingMonths] = useState(3);
-  const [showContactForm, setShowContactForm] = useState(false);
-  const [contactData, setContactData] = useState({
+  const [showBookingForm, setShowBookingForm] = useState(false);
+  const [bookingData, setBookingData] = useState({
     name: '',
     phone: '',
     email: '',
     message: '',
-    visitDate: '',
+    moveInDate: '',
   });
   const [calculatedPrice, setCalculatedPrice] = useState(0);
   const [totalSavings, setTotalSavings] = useState(0);
@@ -87,9 +101,9 @@ const PGDetail = () => {
   const [pg, setPg] = useState<PGListing | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  // Use the wishlist context
-  const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
+
+  // Static phone number (hidden from frontend)
+  const STATIC_PHONE = '9315058665';
 
   useEffect(() => {
     if (!slug) {
@@ -105,7 +119,7 @@ const PGDetail = () => {
 
         let response;
         
-        // Method 1: Try fetching by slug first (this is what we want for SEO-friendly URLs)
+        // Method 1: Try fetching by slug first
         try {
           console.log('Attempting to fetch by slug:', slug);
           response = await api.request<any>(`/api/pg/slug/${slug}`);
@@ -113,24 +127,21 @@ const PGDetail = () => {
         } catch (slugError) {
           console.log('Not found by slug, trying as ID...', slugError);
           
-          // Method 2: If slug fails, try as ID (for backward compatibility)
-          // But only if it looks like a valid ObjectId (24 character hex)
+          // Method 2: If slug fails, try as ID
           if (slug.match(/^[0-9a-fA-F]{24}$/)) {
             response = await api.request<any>(`/api/pg/${slug}`);
             console.log('Found by ID:', response);
           } else {
-            // If it's not a valid ObjectId either, rethrow the error
             throw new Error('PG not found');
           }
         }
         
-        // Handle the response - your API might return data in different formats
+        // Handle the response
         if (response?.data) {
           setPg(response.data);
         } else if (response?.success === false) {
           throw new Error(response.message || "Failed to load PG");
         } else if (response) {
-          // If the response is directly the PG object
           setPg(response);
         } else {
           throw new Error("No data received from server");
@@ -156,67 +167,54 @@ const PGDetail = () => {
     }
   }, [pg, bookingMonths]);
 
-  const handleFavorite = () => {
-    if (!pg) return;
-    
-    // Check if already in wishlist
-    if (isInWishlist(pg._id)) {
-      removeFromWishlist(pg._id);
-      toast.success('Removed from wishlist');
-    } else {
-      // Add to wishlist with all details
-      addToWishlist({
-        _id: pg._id,
-        name: pg.name,
-        price: pg.price,
-        images: pg.images,
-        type: pg.type,
-        city: pg.city,
-        rating: pg.rating
-      });
-      toast.success('Added to wishlist');
-    }
-  };
-
-  const handleContactSubmit = (e: React.FormEvent) => {
+  const handleBookingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success('Contact request submitted!', {
-      description: `We'll connect you with ${pg?.ownerName} shortly.`,
-    });
-    setShowContactForm(false);
-    setContactData({
+    
+    // Create booking message
+    const message = encodeURIComponent(
+      `*New Booking Request*\n\n` +
+      `*PG:* ${pg?.name}\n` +
+      `*Location:* ${pg?.address}\n` +
+      `*Price:* ₹${pg?.price}/month\n` +
+      `*Duration:* ${bookingMonths} months\n` +
+      `*Total:* ₹${calculatedPrice}\n\n` +
+      `*Guest Details:*\n` +
+      `*Name:* ${bookingData.name}\n` +
+      `*Phone:* ${bookingData.phone}\n` +
+      `*Email:* ${bookingData.email}\n` +
+      `*Move-in Date:* ${bookingData.moveInDate}\n` +
+      `*Message:* ${bookingData.message || 'No additional message'}`
+    );
+    
+    // Open WhatsApp with booking details
+    window.open(`https://wa.me/91${STATIC_PHONE}?text=${message}`, '_blank');
+    
+    toast.success('Redirecting to WhatsApp for booking!');
+    setShowBookingForm(false);
+    setBookingData({
       name: '',
       phone: '',
       email: '',
       message: '',
-      visitDate: '',
+      moveInDate: '',
     });
   };
 
   const handleWhatsAppContact = () => {
-    if (!pg) return;
-    
-    const phoneNumber = pg.ownerPhone?.replace(/\D/g, '') || '9315058665';
     const message = encodeURIComponent(
-      `Hello ${pg.ownerName || 'Owner'},\n\nI'm interested in your PG:\n` +
-      `• Name: ${pg.name}\n` +
-      `• Location: ${pg.address}\n` +
-      `• Price: ₹${pg.price}/month\n\n` +
-      `Please contact me for more details.`
+      `Hello,\n\nI'm interested in your PG:\n` +
+      `• Name: ${pg?.name}\n` +
+      `• Location: ${pg?.address}\n` +
+      `• Price: ₹${pg?.price}/month\n\n` +
+      `Please provide more information.`
     );
-    window.open(`https://wa.me/91${phoneNumber}?text=${message}`, '_blank');
+    window.open(`https://wa.me/91${STATIC_PHONE}?text=${message}`, '_blank');
+    toast.success('Opening WhatsApp chat');
   };
 
-  const downloadBrochure = () => {
-    if (!pg) return;
-    
-    toast.success('Brochure downloaded!');
-    const link = document.createElement('a');
-    link.href = '#';
-    link.download = `${pg.name.replace(/\s+/g, '_')}_Brochure.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handlePhoneCall = () => {
+    window.location.href = `tel:${STATIC_PHONE}`;
+    toast.success('Connecting you to the owner...');
   };
 
   const viewOnMap = () => {
@@ -227,62 +225,13 @@ const PGDetail = () => {
     toast.info('Opening location on Google Maps');
   };
 
-  const handleShare = async () => {
+  const getDirections = () => {
     if (!pg) return;
     
-    const shareData = {
-      title: pg.name,
-      text: `Check out ${pg.name} on CU PG Finder - ₹${pg.price}/month`,
-      url: window.location.href,
-    };
-    
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-        toast.success('Shared successfully!');
-      } catch (err) {
-        console.log('Error sharing:', err);
-      }
-    } else {
-      navigator.clipboard.writeText(shareData.url);
-      toast.success('Link copied to clipboard!');
-    }
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(pg.address)}`;
+    window.open(url, '_blank');
+    toast.info('Getting directions to this property');
   };
-
-  const handleContactOwner = () => {
-    setShowContactForm(true);
-  };
-
-  // Mock data for reviews
-  const reviews = [
-    {
-      id: 1,
-      name: 'Rahul Sharma',
-      rating: 5,
-      date: '2 weeks ago',
-      comment: 'Excellent PG with great amenities. The owner is very cooperative and the food quality is amazing. Highly recommended for CU students!',
-      verified: true,
-      program: 'B.Tech CSE, CU'
-    },
-    {
-      id: 2,
-      name: 'Priya Patel',
-      rating: 4,
-      date: '1 month ago',
-      comment: 'Good location near Gate 1 and food quality. Could be cleaner in common areas, but overall a comfortable stay.',
-      verified: true,
-      program: 'MBA, CU'
-    },
-    {
-      id: 3,
-      name: 'Amit Kumar',
-      rating: 4.5,
-      date: '3 months ago',
-      comment: 'Great value for money. The WiFi is fast and the study room is very useful during exams. Close to university.',
-      verified: true,
-      program: 'CA Student'
-    },
-  ];
 
   const roomDetails = pg?.roomTypes?.map((type, index) => ({
     type,
@@ -370,38 +319,6 @@ const PGDetail = () => {
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-white to-orange-50/50">
       <Navbar />
-      
-      {/* Floating Action Buttons */}
-      <div className="fixed right-6 bottom-24 z-40 flex flex-col gap-3">
-        <button
-          onClick={handleFavorite}
-          className={cn(
-            "w-12 h-12 rounded-full shadow-lg border flex items-center justify-center hover:scale-110 transition-all",
-            isInWishlist(pg._id)
-              ? "bg-red-50 border-red-200 text-red-500 hover:bg-red-100"
-              : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-          )}
-          title={isInWishlist(pg._id) ? "Remove from favorites" : "Add to favorites"}
-        >
-          <Heart className={cn("h-5 w-5", isInWishlist(pg._id) && "fill-current")} />
-        </button>
-        
-        <button
-          onClick={handleShare}
-          className="w-12 h-12 rounded-full shadow-lg bg-white text-gray-700 border border-gray-200 flex items-center justify-center hover:scale-110 transition-all hover:bg-gray-50"
-          title="Share"
-        >
-          <Share2 className="h-5 w-5" />
-        </button>
-        
-        <button
-          onClick={downloadBrochure}
-          className="w-12 h-12 rounded-full shadow-lg bg-white text-gray-700 border border-gray-200 flex items-center justify-center hover:scale-110 transition-all hover:bg-gray-50"
-          title="Download Brochure"
-        >
-          <Download className="h-5 w-5" />
-        </button>
-      </div>
 
       <main className="flex-1">
         {/* Breadcrumb */}
@@ -661,12 +578,12 @@ const PGDetail = () => {
                   </div>
                 </TabsContent>
 
-                {/* Advanced Location Tab */}
+                {/* Location Tab */}
                 <TabsContent value="location" className="mt-6">
                   <div className="bg-white rounded-xl p-6 border">
                     <h2 className="text-xl font-bold text-gray-900 mb-6">Location</h2>
                     
-                    {/* Address Section with Map Preview */}
+                    {/* Address Section */}
                     <div className="mb-8 p-4 bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl">
                       <div className="flex items-start gap-4">
                         <div className="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
@@ -678,7 +595,7 @@ const PGDetail = () => {
                           <p className="text-gray-600 mt-1">{pg.locality || pg.city} • {pg.city}</p>
                           <div className="flex items-center gap-2 mt-3">
                             <Badge className="bg-orange-100 text-orange-700">
-                              <Navigation className="h-3 w-3 mr-1" />
+                              <MapPin className="h-3 w-3 mr-1" />
                               {pg.distance || 'Near Chandigarh University'}
                             </Badge>
                           </div>
@@ -696,17 +613,46 @@ const PGDetail = () => {
                         View on Maps
                       </Button>
                       <Button 
+                        onClick={getDirections}
                         variant="outline"
                         className="border-orange-300 hover:bg-orange-50 gap-2"
-                        onClick={() => {
-                          const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(pg.address)}`;
-                          window.open(url, '_blank');
-                        }}
                       >
                         <Route className="h-4 w-4" />
                         Get Directions
                       </Button>
                     </div>
+
+                    {/* Nearby Places from Database */}
+                    {pg.nearbyPlaces && pg.nearbyPlaces.length > 0 && (
+                      <div className="mb-8">
+                        <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                          <Building className="h-4 w-4 text-orange-600" />
+                          Nearby Places
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {pg.nearbyPlaces.map((place, index) => (
+                            <div key={index} className="p-3 bg-gray-50 rounded-lg flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
+                                {place.type === 'university' && <School className="h-4 w-4 text-orange-600" />}
+                                {place.type === 'restaurant' && <Utensils className="h-4 w-4 text-orange-600" />}
+                                {place.type === 'bus_stop' && <Bus className="h-4 w-4 text-orange-600" />}
+                                {place.type === 'railway_station' && <Train className="h-4 w-4 text-orange-600" />}
+                                {place.type === 'hospital' && <Hospital className="h-4 w-4 text-orange-600" />}
+                                {place.type === 'shopping_mall' && <ShoppingBag className="h-4 w-4 text-orange-600" />}
+                                {place.type === 'cafe' && <Coffee className="h-4 w-4 text-orange-600" />}
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-900">{place.name}</p>
+                                <div className="flex items-center gap-2 text-sm text-gray-600">
+                                  <span>Distance: {place.distance}</span>
+                                  {place.duration && <span>• {place.duration}</span>}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Travel Time Summary */}
                     <div className="p-4 bg-gray-50 rounded-lg">
@@ -736,45 +682,9 @@ const PGDetail = () => {
                   </div>
                 </TabsContent>
               </Tabs>
-
-              {/* Reviews Section */}
-              <div className="bg-white rounded-xl p-6 border">
-                <h2 className="text-xl font-bold text-gray-900 mb-6">Reviews</h2>
-                <div className="space-y-6">
-                  {reviews.map((review) => (
-                    <div key={review.id} className="border-b last:border-0 pb-6 last:pb-0">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
-                            <Users className="h-5 w-5 text-orange-600" />
-                          </div>
-                          <div>
-                            <p className="font-bold text-gray-900">{review.name}</p>
-                            <p className="text-sm text-gray-600">{review.program}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center">
-                            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                            <span className="ml-1 font-bold text-gray-900">{review.rating}</span>
-                          </div>
-                          <span className="text-sm text-gray-600">{review.date}</span>
-                        </div>
-                      </div>
-                      <p className="text-gray-700 ml-13">{review.comment}</p>
-                      {review.verified && (
-                        <div className="flex items-center gap-1 mt-2 text-green-600 text-sm">
-                          <BadgeCheck className="h-4 w-4" />
-                          <span>Verified Student</span>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
 
-            {/* Right Column - Booking & Contact */}
+            {/* Right Column - Contact & Booking */}
             <div className="space-y-6">
               {/* Price Calculator Card */}
               <div className="bg-white rounded-2xl p-6 shadow-sm border sticky top-24">
@@ -820,29 +730,39 @@ const PGDetail = () => {
                   </div>
                 </div>
 
-                {/* Action Buttons */}
+                {/* Book Now Button */}
+                <Button 
+                  onClick={() => setShowBookingForm(true)} 
+                  size="lg" 
+                  className="w-full bg-orange-600 hover:bg-orange-700 gap-2 mb-4 text-lg font-semibold"
+                >
+                  <Calendar className="h-5 w-5" />
+                  Book Now
+                </Button>
+
+                {/* Contact Buttons - Without showing number */}
                 <div className="space-y-3 mb-6">
                   <Button 
-                    onClick={handleContactOwner} 
+                    onClick={handlePhoneCall} 
                     size="lg" 
-                    className="w-full bg-orange-600 hover:bg-orange-700 gap-2"
+                    className="w-full bg-green-600 hover:bg-green-700 gap-2"
                   >
                     <Phone className="h-4 w-4" />
-                    Contact Owner
+                    Call Owner
                   </Button>
                   
                   <Button 
                     onClick={handleWhatsAppContact} 
                     variant="outline" 
                     size="lg"
-                    className="w-full border-orange-300 hover:bg-orange-50 gap-2"
+                    className="w-full border-green-600 text-green-700 hover:bg-green-50 gap-2"
                   >
                     <MessageCircle className="h-4 w-4" />
                     WhatsApp
                   </Button>
                 </div>
 
-                {/* Owner Info */}
+                {/* Owner Info - Without showing number */}
                 <div className="pt-6 border-t">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-12 h-12 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 flex items-center justify-center">
@@ -850,31 +770,14 @@ const PGDetail = () => {
                     </div>
                     <div>
                       <p className="font-bold text-gray-900">{pg.ownerName || 'Property Owner'}</p>
-                      <p className="text-gray-600 text-sm">Property Owner</p>
+                      <p className="text-gray-600 text-sm">Property Manager</p>
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-2">
-                    <a href={`tel:${pg.ownerPhone}`}>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        className="w-full text-gray-600 hover:text-orange-600"
-                      >
-                        <PhoneCall className="h-4 w-4 mr-2" />
-                        Call
-                      </Button>
-                    </a>
-                    <a href={`mailto:${pg.ownerEmail}`}>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        className="w-full text-gray-600 hover:text-orange-600"
-                      >
-                        <Mail className="h-4 w-4 mr-2" />
-                        Email
-                      </Button>
-                    </a>
+                  <div className="text-center border-t pt-4">
+                    <p className="text-sm text-gray-600 mb-2">Contact for inquiries:</p>
+                    {/* Phone number hidden - just showing available message */}
+                    <p className="text-sm text-gray-500">Available 24/7 for your queries</p>
                   </div>
                 </div>
               </div>
@@ -910,30 +813,47 @@ const PGDetail = () => {
         </div>
       </main>
 
-      {/* Contact Form Modal */}
-      {showContactForm && (
+      {/* Booking Form Modal */}
+      {showBookingForm && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl max-w-md w-full">
+          <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900">Contact Owner</h2>
+                <h2 className="text-xl font-bold text-gray-900">Book Your Room</h2>
                 <button
-                  onClick={() => setShowContactForm(false)}
+                  onClick={() => setShowBookingForm(false)}
                   className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center"
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
               
-              <form onSubmit={handleContactSubmit} className="space-y-4">
+              <div className="mb-6 p-4 bg-orange-50 rounded-lg">
+                <h3 className="font-bold text-gray-900">{pg.name}</h3>
+                <p className="text-sm text-gray-600 mt-1">{pg.address}</p>
+                <div className="flex justify-between items-center mt-2">
+                  <span className="text-sm font-medium">Selected Room:</span>
+                  <span className="font-bold text-orange-600">{roomDetails[selectedRoom].type}</span>
+                </div>
+                <div className="flex justify-between items-center mt-1">
+                  <span className="text-sm font-medium">Duration:</span>
+                  <span className="font-bold text-orange-600">{bookingMonths} months</span>
+                </div>
+                <div className="flex justify-between items-center mt-1">
+                  <span className="text-sm font-medium">Total Amount:</span>
+                  <span className="font-bold text-orange-600">₹{calculatedPrice.toLocaleString()}</span>
+                </div>
+              </div>
+              
+              <form onSubmit={handleBookingSubmit} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Name
+                    Full Name *
                   </label>
                   <input
                     type="text"
-                    value={contactData.name}
-                    onChange={(e) => setContactData(prev => ({ ...prev, name: e.target.value }))}
+                    value={bookingData.name}
+                    onChange={(e) => setBookingData(prev => ({ ...prev, name: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-orange-500 outline-none"
                     required
                   />
@@ -941,12 +861,12 @@ const PGDetail = () => {
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Phone
+                    Phone Number *
                   </label>
                   <input
                     type="tel"
-                    value={contactData.phone}
-                    onChange={(e) => setContactData(prev => ({ ...prev, phone: e.target.value }))}
+                    value={bookingData.phone}
+                    onChange={(e) => setBookingData(prev => ({ ...prev, phone: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-orange-500 outline-none"
                     required
                   />
@@ -954,44 +874,52 @@ const PGDetail = () => {
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Email
+                    Email Address
                   </label>
                   <input
                     type="email"
-                    value={contactData.email}
-                    onChange={(e) => setContactData(prev => ({ ...prev, email: e.target.value }))}
+                    value={bookingData.email}
+                    onChange={(e) => setBookingData(prev => ({ ...prev, email: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-orange-500 outline-none"
-                    required
                   />
                 </div>
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Message
-                  </label>
-                  <textarea
-                    value={contactData.message}
-                    onChange={(e) => setContactData(prev => ({ ...prev, message: e.target.value }))}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-orange-500 outline-none"
-                    placeholder="I'm interested in this PG..."
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Preferred Visit Date
+                    Preferred Move-in Date *
                   </label>
                   <input
                     type="date"
-                    value={contactData.visitDate}
-                    onChange={(e) => setContactData(prev => ({ ...prev, visitDate: e.target.value }))}
+                    value={bookingData.moveInDate}
+                    onChange={(e) => setBookingData(prev => ({ ...prev, moveInDate: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-orange-500 outline-none"
+                    required
+                    min={new Date().toISOString().split('T')[0]}
                   />
                 </div>
                 
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Additional Message
+                  </label>
+                  <textarea
+                    value={bookingData.message}
+                    onChange={(e) => setBookingData(prev => ({ ...prev, message: e.target.value }))}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-orange-500 outline-none"
+                    placeholder="Any specific requirements or questions..."
+                  />
+                </div>
+                
+                <div className="bg-blue-50 p-3 rounded-lg">
+                  <p className="text-sm text-blue-800 flex items-center gap-2">
+                    <MessageCircle className="h-4 w-4" />
+                    Your booking request will be sent via WhatsApp to the owner
+                  </p>
+                </div>
+                
                 <Button type="submit" className="w-full bg-orange-600 hover:bg-orange-700">
-                  Send Message
+                  Confirm Booking via WhatsApp
                 </Button>
               </form>
             </div>

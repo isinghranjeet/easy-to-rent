@@ -188,7 +188,7 @@ Regards,
       >
         {/* EasyTorent Featured Ribbon */}
         {isFeatured && (
-          <div className="absolute -left-8 top-3 z-10 rotate-45 bg-gradient-to-r from-primary to-primary/80 px-8 py-0.5 text-[8px] font-medium uppercase tracking-wider text-white shadow-sm">
+          <div className="absolute -left-8 top-3 z-10 rotate-45 bg-gradient-to-r from-primary to-primary/80 px-8 py-0.5 text-[10px] font-medium uppercase tracking-wider text-white shadow-sm">
             EasyTorent Featured
           </div>
         )}
@@ -212,13 +212,13 @@ Regards,
           {/* Top Badges */}
           <div className="absolute left-2 top-2 flex gap-1">
             {pg.verified && (
-              <Badge variant="secondary" className="h-5 border-0 bg-white/95 px-1.5 text-[10px] font-medium text-green-600 shadow-sm backdrop-blur">
-                <Shield className="mr-0.5 h-2.5 w-2.5" />
+              <Badge variant="secondary" className="h-6 border-0 bg-white/95 px-2 text-xs font-medium text-green-600 shadow-sm backdrop-blur">
+                <Shield className="mr-1 h-3 w-3" />
                 Verified
               </Badge>
             )}
             {pg.availableRooms && pg.availableRooms <= 2 && (
-              <Badge variant="secondary" className="h-5 border-0 bg-orange-500/90 px-1.5 text-[10px] font-medium text-white shadow-sm">
+              <Badge variant="secondary" className="h-6 border-0 bg-orange-500/90 px-2 text-xs font-medium text-white shadow-sm">
                 Only {pg.availableRooms} left
               </Badge>
             )}
@@ -226,29 +226,29 @@ Regards,
 
           {/* Type Badge */}
           <div className="absolute right-2 top-2">
-            <Badge variant="secondary" className="border-0 bg-white/95 px-2 py-0.5 text-[10px] font-medium text-gray-700 shadow-sm backdrop-blur">
+            <Badge variant="secondary" className="border-0 bg-white/95 px-3 py-1 text-xs font-medium text-gray-700 shadow-sm backdrop-blur">
               {getTypeLabel(pg.type || 'co-ed')}
             </Badge>
           </div>
 
           {/* Action Buttons */}
-          <div className="absolute right-2 top-12 flex flex-col gap-1.5">
+          <div className="absolute right-2 top-12 flex flex-col gap-2">
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   onClick={(e) => handleAuthAction('wishlist', e)}
                   className={cn(
-                    "flex h-7 w-7 items-center justify-center rounded-full transition-all hover:scale-110 shadow-sm",
+                    "flex h-9 w-9 items-center justify-center rounded-full transition-all hover:scale-110 shadow-sm",
                     isAuthenticated && isInWishlist(pg.id)
                       ? "bg-red-500 text-white hover:bg-red-600"
                       : "bg-white/95 text-gray-700 hover:bg-white"
                   )}
                   aria-label="Add to wishlist"
                 >
-                  <Heart className={cn("h-3.5 w-3.5", isAuthenticated && isInWishlist(pg.id) && "fill-current")} />
+                  <Heart className={cn("h-4 w-4", isAuthenticated && isInWishlist(pg.id) && "fill-current")} />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="left" className="text-xs">
+              <TooltipContent side="left" className="text-sm">
                 <p>{isAuthenticated && isInWishlist(pg.id) ? "Remove from wishlist" : "Add to wishlist"}</p>
               </TooltipContent>
             </Tooltip>
@@ -258,7 +258,7 @@ Regards,
                 <button
                   onClick={(e) => handleAuthAction('compare', e)}
                   className={cn(
-                    "flex h-7 w-7 items-center justify-center rounded-full transition-all hover:scale-110 shadow-sm",
+                    "flex h-9 w-9 items-center justify-center rounded-full transition-all hover:scale-110 shadow-sm",
                     isAuthenticated && isInCompare(pg.id)
                       ? "bg-primary text-white hover:bg-primary/90"
                       : "bg-white/95 text-gray-700 hover:bg-white"
@@ -266,22 +266,22 @@ Regards,
                   aria-label="Compare property"
                 >
                   {isAuthenticated && isInCompare(pg.id) ? (
-                    <Check className="h-3.5 w-3.5" />
+                    <Check className="h-4 w-4" />
                   ) : (
-                    <GitCompare className="h-3.5 w-3.5" />
+                    <GitCompare className="h-4 w-4" />
                   )}
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="left" className="text-xs">
+              <TooltipContent side="left" className="text-sm">
                 <p>{isAuthenticated && isInCompare(pg.id) ? "Remove from compare" : "Add to compare"}</p>
               </TooltipContent>
             </Tooltip>
           </div>
 
           {/* Price Tag */}
-          <div className="absolute bottom-2 right-2 rounded-md bg-white/95 px-2 py-1 shadow-sm backdrop-blur">
-            <span className="text-sm font-bold text-primary">₹{pg.price.toLocaleString()}</span>
-            <span className="text-[10px] text-muted-foreground">/month</span>
+          <div className="absolute bottom-2 right-2 rounded-md bg-white/95 px-3 py-1.5 shadow-sm backdrop-blur">
+            <span className="text-base font-bold text-primary">₹{pg.price.toLocaleString()}</span>
+            <span className="text-xs text-muted-foreground">/month</span>
           </div>
 
           {/* Image Navigation */}
@@ -293,9 +293,9 @@ Regards,
                   e.stopPropagation();
                   setCurrentImage(prev => prev === 0 ? displayImages.length - 1 : prev - 1);
                 }}
-                className="absolute left-1 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-1 text-white opacity-0 transition group-hover:opacity-100 hover:bg-black/70"
+                className="absolute left-1 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-1.5 text-white opacity-0 transition group-hover:opacity-100 hover:bg-black/70"
               >
-                <ChevronLeft className="h-3 w-3" />
+                <ChevronLeft className="h-4 w-4" />
               </button>
               <button
                 onClick={(e) => {
@@ -303,38 +303,38 @@ Regards,
                   e.stopPropagation();
                   setCurrentImage(prev => (prev + 1) % displayImages.length);
                 }}
-                className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-1 text-white opacity-0 transition group-hover:opacity-100 hover:bg-black/70"
+                className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-1.5 text-white opacity-0 transition group-hover:opacity-100 hover:bg-black/70"
               >
-                <ChevronRight className="h-3 w-3" />
+                <ChevronRight className="h-4 w-4" />
               </button>
             </>
           )}
 
           {/* Image Counter */}
           {displayImages.length > 1 && (
-            <div className="absolute bottom-2 left-2 rounded-full bg-black/50 px-1.5 py-0.5 text-[8px] text-white backdrop-blur">
+            <div className="absolute bottom-2 left-2 rounded-full bg-black/50 px-2 py-1 text-xs text-white backdrop-blur">
               {currentImage + 1}/{displayImages.length}
             </div>
           )}
         </div>
 
         {/* Content Section */}
-        <CardContent className="p-3">
+        <CardContent className="p-4">
           {/* Rating & Reviews */}
           <div className="mb-2 flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <div className="flex items-center gap-0.5 rounded bg-yellow-50 px-1 py-0.5">
-                <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                <span className="text-xs font-semibold">{pg.rating?.toFixed(1) || '4.5'}</span>
+              <div className="flex items-center gap-1 rounded bg-yellow-50 px-1.5 py-1">
+                <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+                <span className="text-sm font-semibold">{pg.rating?.toFixed(1) || '4.5'}</span>
               </div>
-              <span className="text-[10px] text-muted-foreground">
+              <span className="text-xs text-muted-foreground">
                 ({pg.reviewCount || 0} reviews)
               </span>
             </div>
             
             {pg.minStay && (
-              <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
-                <Clock className="h-2.5 w-2.5" />
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Clock className="h-3 w-3" />
                 <span>Min {pg.minStay}</span>
               </div>
             )}
@@ -342,14 +342,14 @@ Regards,
 
           {/* Property Name */}
           <Link to={`/pg/${pg._id || pg.id}`} className="block" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-1 text-sm font-semibold leading-tight text-foreground hover:text-primary transition-colors line-clamp-1">
+            <h3 className="mb-1.5 text-base font-semibold leading-tight text-foreground hover:text-primary transition-colors line-clamp-1">
               {pg.name}
             </h3>
           </Link>
 
           {/* Location */}
-          <div className="mb-2 flex items-start gap-1 text-[11px] text-muted-foreground">
-            <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
+          <div className="mb-2 flex items-start gap-1 text-sm text-muted-foreground">
+            <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span className="line-clamp-1">
               {pg.locality}, {pg.city}
               {pg.distance && <span className="ml-1 font-medium text-primary">• {pg.distance}</span>}
@@ -358,28 +358,28 @@ Regards,
 
           {/* EasyTorent Badge */}
           <div className="mb-2 flex items-center gap-1">
-            <Badge variant="outline" className="border-primary/20 bg-primary/5 px-1.5 py-0.5 text-[8px] font-medium text-primary">
-              <Building className="mr-0.5 h-2.5 w-2.5" />
+            <Badge variant="outline" className="border-primary/20 bg-primary/5 px-2 py-0.5 text-xs font-medium text-primary">
+              <Building className="mr-1 h-3 w-3" />
               EasyTorent Verified
             </Badge>
           </div>
 
           {/* Description */}
-          <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground line-clamp-1">
+          <p className="mb-2 text-sm leading-relaxed text-muted-foreground line-clamp-2">
             {pg.description || 'Premium PG accommodation with modern amenities and comfortable living spaces.'}
           </p>
 
           {/* Amenities Grid */}
-          <div className="mb-3 grid grid-cols-4 gap-1">
+          <div className="mb-3 grid grid-cols-4 gap-1.5">
             {pg.wifi && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="flex flex-col items-center gap-0.5 rounded bg-primary/5 p-1">
-                    <Wifi className="h-3 w-3 text-primary" />
-                    <span className="text-[8px] text-primary">WiFi</span>
+                  <div className="flex flex-col items-center gap-1 rounded bg-primary/5 p-1.5">
+                    <Wifi className="h-4 w-4 text-primary" />
+                    <span className="text-xs text-primary">WiFi</span>
                   </div>
                 </TooltipTrigger>
-                <TooltipContent className="text-xs">
+                <TooltipContent className="text-sm">
                   <p>High-speed WiFi available</p>
                 </TooltipContent>
               </Tooltip>
@@ -387,12 +387,12 @@ Regards,
             {pg.meals && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="flex flex-col items-center gap-0.5 rounded bg-primary/5 p-1">
-                    <Utensils className="h-3 w-3 text-primary" />
-                    <span className="text-[8px] text-primary">Meals</span>
+                  <div className="flex flex-col items-center gap-1 rounded bg-primary/5 p-1.5">
+                    <Utensils className="h-4 w-4 text-primary" />
+                    <span className="text-xs text-primary">Meals</span>
                   </div>
                 </TooltipTrigger>
-                <TooltipContent className="text-xs">
+                <TooltipContent className="text-sm">
                   <p>Home-cooked meals included</p>
                 </TooltipContent>
               </Tooltip>
@@ -400,12 +400,12 @@ Regards,
             {pg.ac && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="flex flex-col items-center gap-0.5 rounded bg-primary/5 p-1">
-                    <Wind className="h-3 w-3 text-primary" />
-                    <span className="text-[8px] text-primary">A/C</span>
+                  <div className="flex flex-col items-center gap-1 rounded bg-primary/5 p-1.5">
+                    <Wind className="h-4 w-4 text-primary" />
+                    <span className="text-xs text-primary">A/C</span>
                   </div>
                 </TooltipTrigger>
-                <TooltipContent className="text-xs">
+                <TooltipContent className="text-sm">
                   <p>Air conditioned rooms</p>
                 </TooltipContent>
               </Tooltip>
@@ -413,12 +413,12 @@ Regards,
             {pg.parking && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="flex flex-col items-center gap-0.5 rounded bg-primary/5 p-1">
-                    <Car className="h-3 w-3 text-primary" />
-                    <span className="text-[8px] text-primary">Parking</span>
+                  <div className="flex flex-col items-center gap-1 rounded bg-primary/5 p-1.5">
+                    <Car className="h-4 w-4 text-primary" />
+                    <span className="text-xs text-primary">Parking</span>
                   </div>
                 </TooltipTrigger>
-                <TooltipContent className="text-xs">
+                <TooltipContent className="text-sm">
                   <p>Vehicle parking available</p>
                 </TooltipContent>
               </Tooltip>
@@ -427,22 +427,22 @@ Regards,
 
           {/* Additional Amenities */}
           {pg.amenities && pg.amenities.length > 0 && (
-            <div className="mb-3 flex flex-wrap items-center gap-1">
-              <span className="text-[9px] font-medium text-muted-foreground">Amenities:</span>
-              <div className="flex flex-wrap gap-1">
+            <div className="mb-3 flex flex-wrap items-center gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Amenities:</span>
+              <div className="flex flex-wrap gap-1.5">
                 {pg.amenities.slice(0, 2).map((item, idx) => (
-                  <Badge key={idx} variant="outline" className="h-4 border-border/50 px-1 text-[8px] font-normal">
+                  <Badge key={idx} variant="outline" className="h-5 border-border/50 px-1.5 text-xs font-normal">
                     {item}
                   </Badge>
                 ))}
                 {pg.amenities.length > 2 && (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Badge variant="outline" className="h-4 border-border/50 px-1 text-[8px] font-normal cursor-help">
+                      <Badge variant="outline" className="h-5 border-border/50 px-1.5 text-xs font-normal cursor-help">
                         +{pg.amenities.length - 2} more
                       </Badge>
                     </TooltipTrigger>
-                    <TooltipContent className="text-xs">
+                    <TooltipContent className="text-sm">
                       <p>{pg.amenities.slice(2).join(', ')}</p>
                     </TooltipContent>
                   </Tooltip>
@@ -452,11 +452,11 @@ Regards,
           )}
 
           {/* Action Buttons */}
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="grid grid-cols-3 gap-2">
             <Button
               variant="outline"
               size="sm"
-              className="h-7 border-muted-foreground/20 text-[11px] font-medium hover:bg-muted/50"
+              className="h-8 border-muted-foreground/20 text-sm font-medium hover:bg-muted/50"
               onClick={(e) => {
                 e.stopPropagation();
                 navigate(`/pg/${pg.id}`);
@@ -472,9 +472,9 @@ Regards,
             >
               <Button
                 size="sm"
-                className="h-7 w-full gap-1 bg-gradient-to-r from-orange-500 to-orange-600 px-0 text-[11px] font-medium hover:from-orange-600 hover:to-orange-700"
+                className="h-8 w-full gap-1.5 bg-gradient-to-r from-orange-500 to-orange-600 px-0 text-sm font-medium hover:from-orange-600 hover:to-orange-700"
               >
-                <Phone className="h-3 w-3" />
+                <Phone className="h-3.5 w-3.5" />
                 Call
               </Button>
             </a>
@@ -488,21 +488,21 @@ Regards,
             >
               <Button
                 size="sm"
-                className="h-7 w-full gap-1 bg-gradient-to-r from-green-500 to-green-600 px-0 text-[11px] font-medium text-white hover:from-green-600 hover:to-green-700"
+                className="h-8 w-full gap-1.5 bg-gradient-to-r from-green-500 to-green-600 px-0 text-sm font-medium text-white hover:from-green-600 hover:to-green-700"
               >
-                <MessageCircle className="h-3 w-3" />
+                <MessageCircle className="h-3.5 w-3.5" />
                 Chat
               </Button>
             </a>
           </div>
 
           {/* EasyTorent Footer */}
-          <div className="mt-2 flex items-center justify-between border-t border-border/50 pt-2 text-[9px] text-muted-foreground">
-            <span className="flex items-center gap-0.5">
-              <Building className="h-2.5 w-2.5" />
+          <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-2 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Building className="h-3 w-3" />
               <span className="font-medium text-foreground">EasyTorent</span>
             </span>
-            <span className="text-[8px]">Listed on EasyTorent</span>
+            <span className="text-xs">Listed on EasyTorent</span>
           </div>
         </CardContent>
 
