@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useCallback, memo } from 'react';
+import { useState, useCallback, memo, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Heart,
@@ -76,6 +76,12 @@ export const PGCard = memo(({ pg, index = 0, variant = 'default' }: PGCardProps)
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<'wishlist' | 'compare' | null>(null);
   const [isHovered, setIsHovered] = useState(false);
+  const [touchStart, setTouchStart] = useState(0);
+  const [touchEnd, setTouchEnd] = useState(0);
+  const [showThumbnails, setShowThumbnails] = useState(false);
+  
+  const imageRef = useRef<HTMLDivElement>(null);
+  const autoPlayRef = useRef<NodeJS.Timeout>();
   
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -88,6 +94,58 @@ export const PGCard = memo(({ pg, index = 0, variant = 'default' }: PGCardProps)
   const allImages = [...(pg.images || []), ...(pg.gallery || [])].filter(Boolean);
   const displayImages = allImages.length > 0 ? allImages : [FALLBACK_IMAGE];
   const isFeatured = variant === 'featured' || pg.featured;
+
+  // Auto-play functionality
+  useEffect(() => {
+    if (displayImages.length > 1 && isHovered) {
+      autoPlayRef.current = setInterval(() => {
+        setCurrentImage(prev => (prev + 1) % displayImages.length);
+      }, 3000);
+    }
+    
+    return () => {
+      if (autoPlayRef.current) {
+        clearInterval(autoPlayRef.current);
+      }
+    };
+  }, [isHovered, displayImages.length]);
+
+  // Touch handlers for mobile swipe
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStart - touchEnd > 75) {
+      // Swipe left
+      nextImage();
+    } else if (touchStart - touchEnd < -75) {
+      // Swipe right
+      prevImage();
+    }
+  };
+
+  const nextImage = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    setCurrentImage(prev => (prev + 1) % displayImages.length);
+  };
+
+  const prevImage = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    setCurrentImage(prev => prev === 0 ? displayImages.length - 1 : prev - 1);
+  };
+
+  const goToImage = (index: number, e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    setCurrentImage(index);
+  };
 
   // Format contact number
   const phoneNumber = CONTACT_NUMBER;
@@ -193,24 +251,40 @@ Regards,
           </div>
         )}
 
-        {/* Image Section */}
-        <div className="relative aspect-[4/3] overflow-hidden bg-muted">
-          <img
-            src={displayImages[currentImage]}
-            alt={pg.name}
-            className={cn(
-              "h-full w-full object-cover transition-all duration-500",
-              isHovered && "scale-105"
-            )}
-            onError={(e) => (e.currentTarget.src = FALLBACK_IMAGE)}
-            loading="lazy"
-          />
+        {/* Image Section with Touch Support */}
+        <div 
+          ref={imageRef}
+          className="relative aspect-[4/3] overflow-hidden bg-muted"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* Image Container with Smooth Transition */}
+          <div 
+            className="flex h-full transition-transform duration-500 ease-out"
+            style={{ transform: `translateX(-${currentImage * 100}%)` }}
+          >
+            {displayImages.map((image, idx) => (
+              <div key={idx} className="relative h-full w-full flex-shrink-0">
+                <img
+                  src={image}
+                  alt={`${pg.name} - ${idx + 1}`}
+                  className={cn(
+                    "h-full w-full object-cover",
+                    isHovered && "scale-105 transition-transform duration-700"
+                  )}
+                  onError={(e) => (e.currentTarget.src = FALLBACK_IMAGE)}
+                  loading="lazy"
+                />
+              </div>
+            ))}
+          </div>
 
           {/* Gradient Overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
           {/* Top Badges */}
-          <div className="absolute left-2 top-2 flex gap-1">
+          <div className="absolute left-2 top-2 flex gap-1 z-10">
             {pg.verified && (
               <Badge variant="secondary" className="h-6 border-0 bg-white/95 px-2 text-xs font-medium text-green-600 shadow-sm backdrop-blur">
                 <Shield className="mr-1 h-3 w-3" />
@@ -225,14 +299,14 @@ Regards,
           </div>
 
           {/* Type Badge */}
-          <div className="absolute right-2 top-2">
+          <div className="absolute right-2 top-2 z-10">
             <Badge variant="secondary" className="border-0 bg-white/95 px-3 py-1 text-xs font-medium text-gray-700 shadow-sm backdrop-blur">
               {getTypeLabel(pg.type || 'co-ed')}
             </Badge>
           </div>
 
           {/* Action Buttons */}
-          <div className="absolute right-2 top-12 flex flex-col gap-2">
+          <div className="absolute right-2 top-12 z-10 flex flex-col gap-2">
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
@@ -279,44 +353,83 @@ Regards,
           </div>
 
           {/* Price Tag */}
-          <div className="absolute bottom-2 right-2 rounded-md bg-white/95 px-3 py-1.5 shadow-sm backdrop-blur">
+          <div className="absolute bottom-2 right-2 z-10 rounded-md bg-white/95 px-3 py-1.5 shadow-sm backdrop-blur">
             <span className="text-base font-bold text-primary">₹{pg.price.toLocaleString()}</span>
             <span className="text-xs text-muted-foreground">/month</span>
           </div>
 
-          {/* Image Navigation */}
+          {/* Image Navigation Arrows - Visible on hover and always on mobile */}
           {displayImages.length > 1 && (
             <>
               <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setCurrentImage(prev => prev === 0 ? displayImages.length - 1 : prev - 1);
-                }}
-                className="absolute left-1 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-1.5 text-white opacity-0 transition group-hover:opacity-100 hover:bg-black/70"
+                onClick={prevImage}
+                className={cn(
+                  "absolute left-1 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-all hover:bg-black/70 z-10",
+                  "md:opacity-0 md:group-hover:opacity-100 opacity-100"
+                )}
+                aria-label="Previous image"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setCurrentImage(prev => (prev + 1) % displayImages.length);
-                }}
-                className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-1.5 text-white opacity-0 transition group-hover:opacity-100 hover:bg-black/70"
+                onClick={nextImage}
+                className={cn(
+                  "absolute right-1 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-all hover:bg-black/70 z-10",
+                  "md:opacity-0 md:group-hover:opacity-100 opacity-100"
+                )}
+                aria-label="Next image"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
             </>
           )}
 
-          {/* Image Counter */}
+          {/* Image Counter - Always Visible */}
           {displayImages.length > 1 && (
-            <div className="absolute bottom-2 left-2 rounded-full bg-black/50 px-2 py-1 text-xs text-white backdrop-blur">
+            <div className="absolute bottom-2 left-2 z-10 rounded-full bg-black/50 px-2 py-1 text-xs text-white backdrop-blur">
               {currentImage + 1}/{displayImages.length}
             </div>
           )}
+
+          {/* Dots Indicator - Mobile Friendly */}
+          {displayImages.length > 1 && (
+            <div className="absolute bottom-2 left-1/2 z-10 flex -translate-x-1/2 gap-1.5">
+              {displayImages.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={(e) => goToImage(idx, e)}
+                  className={cn(
+                    "h-1.5 rounded-full transition-all",
+                    idx === currentImage 
+                      ? "w-6 bg-white" 
+                      : "w-1.5 bg-white/60 hover:bg-white/80"
+                  )}
+                  aria-label={`Go to image ${idx + 1}`}
+                />
+              ))}
+            </div>
+          )}
         </div>
+
+        {/* Thumbnail Preview - Visible on hover/click */}
+        {displayImages.length > 1 && showThumbnails && (
+          <div className="absolute left-2 right-2 top-1/2 z-20 -translate-y-1/2 rounded-lg bg-black/80 p-2 backdrop-blur">
+            <div className="flex gap-1 overflow-x-auto py-1">
+              {displayImages.map((image, idx) => (
+                <button
+                  key={idx}
+                  onClick={(e) => goToImage(idx, e)}
+                  className={cn(
+                    "h-12 w-12 flex-shrink-0 overflow-hidden rounded border-2 transition-all",
+                    idx === currentImage ? "border-primary scale-110" : "border-transparent opacity-70"
+                  )}
+                >
+                  <img src={image} alt="" className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Content Section */}
         <CardContent className="p-4">
