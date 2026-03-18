@@ -58,11 +58,23 @@ export function Footer() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [attachments, setAttachments] = useState([]);
+  const [isMobile, setIsMobile] = useState(false);
 
   const chatEndRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
   const settingsRef = useRef(null);
+  const chatRef = useRef(null);
+
+  // Check if mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Knowledge base for responses (keeping your existing knowledgeBase object)
   const knowledgeBase = {
@@ -118,6 +130,17 @@ export function Footer() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Handle escape key
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape' && showChat) {
+        setShowChat(false);
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [showChat]);
 
   const handleNewsletterSubmit = (e) => {
     e.preventDefault();
@@ -366,7 +389,7 @@ export function Footer() {
           border-color: #f97316;
         }
         
-        /* Chat Window */
+        /* Chat Window - Responsive */
         .chat-window {
           position: fixed;
           bottom: 90px;
@@ -378,11 +401,47 @@ export function Footer() {
           z-index: 1000;
           overflow: hidden;
           border: 1px solid #e2e8f0;
+          transition: all 0.3s ease;
+        }
+        
+        @media (max-width: 768px) {
+          .chat-window {
+            width: 90vw;
+            right: 5vw;
+            left: 5vw;
+            bottom: 80px;
+            max-height: 80vh;
+          }
+        }
+        
+        @media (max-width: 480px) {
+          .chat-window {
+            width: 96vw;
+            right: 2vw;
+            left: 2vw;
+            bottom: 70px;
+            max-height: 85vh;
+          }
+          
+          .live-support-btn {
+            padding: 12px 20px !important;
+            font-size: 14px !important;
+          }
+          
+          .live-support-btn span {
+            display: inline-block !important;
+          }
         }
         
         .chat-window.minimized {
           height: 70px;
           overflow: hidden;
+        }
+        
+        @media (max-width: 768px) {
+          .chat-window.minimized {
+            height: 60px;
+          }
         }
         
         .chat-header {
@@ -393,11 +452,24 @@ export function Footer() {
           border-bottom: 2px solid #f97316;
         }
         
+        @media (max-width: 768px) {
+          .chat-header {
+            padding: 12px 16px;
+          }
+        }
+        
         .chat-body {
           padding: 20px;
           max-height: 450px;
           overflow-y: auto;
           background: #f8fafc;
+        }
+        
+        @media (max-width: 768px) {
+          .chat-body {
+            padding: 16px;
+            max-height: calc(80vh - 120px);
+          }
         }
         
         /* Message bubbles */
@@ -412,6 +484,14 @@ export function Footer() {
           word-wrap: break-word;
           line-height: 1.5;
           position: relative;
+        }
+        
+        @media (max-width: 768px) {
+          .message-bubble {
+            max-width: 90%;
+            padding: 10px 14px;
+            font-size: 14px;
+          }
         }
         
         .agent-message {
@@ -476,6 +556,13 @@ export function Footer() {
           box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
         
+        @media (max-width: 768px) {
+          .message-actions {
+            opacity: 0.8;
+            top: -6px;
+          }
+        }
+        
         .message-bubble:hover .message-actions {
           opacity: 1;
         }
@@ -518,6 +605,13 @@ export function Footer() {
           transition: all 0.2s ease;
         }
         
+        @media (max-width: 768px) {
+          .property-chip {
+            padding: 6px 12px;
+            font-size: 12px;
+          }
+        }
+        
         .property-chip:hover {
           background: #f97316;
           border-color: #f97316;
@@ -538,6 +632,13 @@ export function Footer() {
           font-size: 14px;
           background: white;
           color: #1e293b;
+        }
+        
+        @media (max-width: 768px) {
+          .search-input {
+            padding: 8px 14px 8px 36px;
+            font-size: 13px;
+          }
         }
         
         .search-input:focus {
@@ -589,6 +690,12 @@ export function Footer() {
           position: relative;
         }
         
+        @media (max-width: 768px) {
+          .chat-input-area {
+            padding: 12px 16px;
+          }
+        }
+        
         .chat-input-container {
           background: #ffffff;
           border: 2px solid #e2e8f0;
@@ -597,10 +704,6 @@ export function Footer() {
           display: flex;
           align-items: center;
           transition: border-color 0.2s ease;
-        }
-        
-        .chat-input-container:focus-within {
-          border-color: #f97316;
         }
         
         .chat-input {
@@ -614,6 +717,13 @@ export function Footer() {
           resize: none;
           max-height: 100px;
           font-family: inherit;
+        }
+        
+        @media (max-width: 768px) {
+          .chat-input {
+            padding: 8px 0;
+            font-size: 14px;
+          }
         }
         
         .chat-input::placeholder {
@@ -640,6 +750,13 @@ export function Footer() {
           transition: all 0.2s ease;
         }
         
+        @media (max-width: 768px) {
+          .input-action-btn {
+            width: 32px;
+            height: 32px;
+          }
+        }
+        
         .input-action-btn:hover {
           background: #f1f5f9;
           color: #f97316;
@@ -659,6 +776,17 @@ export function Footer() {
           cursor: pointer;
           margin-left: 8px;
           transition: all 0.2s ease;
+        }
+        
+        @media (max-width: 768px) {
+          .send-btn {
+            padding: 8px 16px;
+            font-size: 13px;
+          }
+          
+          .send-btn span {
+            display: none;
+          }
         }
         
         .send-btn:hover:not(:disabled) {
@@ -708,6 +836,15 @@ export function Footer() {
           z-index: 30;
         }
         
+        @media (max-width: 768px) {
+          .emoji-picker {
+            bottom: 70px;
+            left: 10px;
+            right: 10px;
+            grid-template-columns: repeat(7, 1fr);
+          }
+        }
+        
         .emoji-item {
           width: 36px;
           height: 36px;
@@ -718,6 +855,14 @@ export function Footer() {
           cursor: pointer;
           border-radius: 8px;
           transition: all 0.2s ease;
+        }
+        
+        @media (max-width: 768px) {
+          .emoji-item {
+            width: 32px;
+            height: 32px;
+            font-size: 18px;
+          }
         }
         
         .emoji-item:hover {
@@ -781,6 +926,12 @@ export function Footer() {
           transform: translateY(-2px);
         }
         
+        @media (max-width: 480px) {
+          .live-support-btn {
+            padding: 10px 16px !important;
+          }
+        }
+        
         /* Contact panel */
         .contact-panel {
           background: white;
@@ -788,6 +939,12 @@ export function Footer() {
           padding: 16px;
           margin-top: 16px;
           border: 1px solid #e2e8f0;
+        }
+        
+        @media (max-width: 768px) {
+          .contact-panel {
+            padding: 12px;
+          }
         }
         
         .contact-item {
@@ -813,7 +970,7 @@ export function Footer() {
           color: #f97316;
         }
         
-        /* Settings menu - FIXED POSITIONING */
+        /* Settings menu */
         .settings-menu {
           position: absolute;
           top: 50px;
@@ -825,6 +982,14 @@ export function Footer() {
           border: 1px solid #e2e8f0;
           z-index: 40;
           min-width: 180px;
+        }
+        
+        @media (max-width: 768px) {
+          .settings-menu {
+            top: 45px;
+            right: 10px;
+            min-width: 160px;
+          }
         }
         
         .settings-item {
@@ -865,6 +1030,13 @@ export function Footer() {
           transition: background 0.2s ease;
         }
         
+        @media (max-width: 768px) {
+          .header-btn {
+            width: 28px;
+            height: 28px;
+          }
+        }
+        
         .header-btn:hover {
           background: rgba(255, 255, 255, 0.15);
         }
@@ -872,34 +1044,58 @@ export function Footer() {
         .header-btn.active {
           background: rgba(249, 115, 22, 0.3);
         }
+
+        /* Mobile touch optimizations */
+        @media (max-width: 768px) {
+          button, 
+          .property-chip,
+          .input-action-btn,
+          .send-btn,
+          .header-btn,
+          .settings-item,
+          .emoji-item {
+            min-height: 44px;
+            min-width: 44px;
+          }
+          
+          .property-chip {
+            min-height: 36px;
+          }
+          
+          .input-action-btn,
+          .header-btn {
+            min-height: 40px;
+            min-width: 40px;
+          }
+        }
         `}
       </style>
 
       <footer className="footer-gradient mt-auto text-white">
-        <div className="container mx-auto px-4 py-12">
+        <div className="container mx-auto px-4 py-8 md:py-12">
 
           {/* Trust Badges */}
-          <div className="mb-10 rounded-xl trust-badge p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="mb-8 md:mb-10 rounded-xl trust-badge p-4 md:p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
               <div className="flex items-center gap-3">
-                <ShieldCheck className="h-8 w-8 text-orange-400" />
+                <ShieldCheck className="h-6 w-6 md:h-8 md:w-8 text-orange-400" />
                 <div>
-                  <h4 className="font-semibold">Verified Properties</h4>
-                  <p className="text-sm text-gray-400">All listings physically verified</p>
+                  <h4 className="font-semibold text-sm md:text-base">Verified Properties</h4>
+                  <p className="text-xs md:text-sm text-gray-400">All listings physically verified</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <UserCheck className="h-8 w-8 text-orange-400" />
+                <UserCheck className="h-6 w-6 md:h-8 md:w-8 text-orange-400" />
                 <div>
-                  <h4 className="font-semibold">Trusted Owners</h4>
-                  <p className="text-sm text-gray-400">Background verified</p>
+                  <h4 className="font-semibold text-sm md:text-base">Trusted Owners</h4>
+                  <p className="text-xs md:text-sm text-gray-400">Background verified</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <CheckCircle className="h-8 w-8 text-orange-400" />
+                <CheckCircle className="h-6 w-6 md:h-8 md:w-8 text-orange-400" />
                 <div>
-                  <h4 className="font-semibold">Easy Booking</h4>
-                  <p className="text-sm text-gray-400">Simple rental process</p>
+                  <h4 className="font-semibold text-sm md:text-base">Easy Booking</h4>
+                  <p className="text-xs md:text-sm text-gray-400">Simple rental process</p>
                 </div>
               </div>
             </div>
@@ -926,7 +1122,6 @@ export function Footer() {
                     className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 hover:bg-orange-500 footer-social"
                     onClick={(e) => {
                       e.preventDefault();
-                      // Add your social media links here
                       const socialLinks = [
                         "https://facebook.com/easytorent",
                         "https://twitter.com/easytorent",
@@ -942,87 +1137,127 @@ export function Footer() {
               </div>
             </div>
 
-            {/* Quick Links - FIXED WITH CORRECT ROUTES */}
-            <div>
-              <h4 className="footer-title text-lg font-semibold text-orange-400">Quick Links</h4>
-              <ul className="mt-4 space-y-2 text-sm text-gray-400">
-                <li>
-                  <Link to="/pg-list" className="footer-link hover:text-orange-400">
-                    Find Properties
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/register-property" className="footer-link hover:text-orange-400">
-                    List Property
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/how-it-works-page" className="footer-link hover:text-orange-400">
-                    How It Works
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/contact" className="footer-link hover:text-orange-400">
-                    Contact Us
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/faq" className="footer-link hover:text-orange-400">
-                    FAQs
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/about" className="footer-link hover:text-orange-400">
-                    About Us
-                  </Link>
-                </li>
-              </ul>
-            </div>
 
-            {/* Locations - FIXED WITH FILTER ROUTES */}
+
+
+
+            {/* Quick Links - Updated with correct page mappings */}
+<div>
+  <h4 className="footer-title text-lg font-semibold text-orange-400">Quick Links</h4>
+  <ul className="mt-4 space-y-2 text-sm text-gray-400">
+    <li>
+      <Link to="/" className="footer-link hover:text-orange-400">
+        Home
+      </Link>
+    </li>
+    <li>
+      <Link to="/about" className="footer-link hover:text-orange-400">
+        About Us
+      </Link>
+    </li>
+    <li>
+      <Link to="/how-it-works" className="footer-link hover:text-orange-400">
+        How It Works
+      </Link>
+    </li>
+    <li>
+      <Link to="/pg-list" className="footer-link hover:text-orange-400">
+        Properties
+      </Link>
+    </li>
+    <li>
+      <Link to="/register-property" className="footer-link hover:text-orange-400">
+        List Your Property
+      </Link>
+    </li>
+    <li>
+      <Link to="/contact" className="footer-link hover:text-orange-400">
+        Contact
+      </Link>
+    </li>
+    <li>
+      <Link to="/blog" className="footer-link hover:text-orange-400">
+        Blog
+      </Link>
+    </li>
+    <li>
+      <Link to="/faq" className="footer-link hover:text-orange-400">
+        FAQ
+      </Link>
+    </li>
+    <li>
+      <Link to="/privacy" className="footer-link hover:text-orange-400">
+        Privacy Policy
+      </Link>
+    </li>
+    <li>
+      <Link to="/terms" className="footer-link hover:text-orange-400">
+        Terms & Conditions
+      </Link>
+    </li>
+    <li>
+      <Link to="/refund" className="footer-link hover:text-orange-400">
+        Refund Policy
+      </Link>
+    </li>
+  </ul>
+</div>
+
+
+
+
+
+
+            {/* Popular Locations */}
             <div>
               <h4 className="footer-title text-lg font-semibold text-orange-400">Popular Locations</h4>
               <ul className="mt-4 space-y-2 text-sm text-gray-400">
                 <li className="flex items-center gap-2">
                   <ChevronRight className="h-3 w-3 text-orange-400" />
-                  <Link to="/pg-list?location=university-area" className="footer-link hover:text-orange-400">
+                  <Link to="/properties?location=university-area" className="footer-link hover:text-orange-400">
                     University Area
                   </Link>
                 </li>
                 <li className="flex items-center gap-2">
                   <ChevronRight className="h-3 w-3 text-orange-400" />
-                  <Link to="/pg-list?location=city-center" className="footer-link hover:text-orange-400">
+                  <Link to="/properties?location=city-center" className="footer-link hover:text-orange-400">
                     City Center
                   </Link>
                 </li>
                 <li className="flex items-center gap-2">
                   <ChevronRight className="h-3 w-3 text-orange-400" />
-                  <Link to="/pg-list?location=library-road" className="footer-link hover:text-orange-400">
+                  <Link to="/properties?location=library-road" className="footer-link hover:text-orange-400">
                     Library Road
                   </Link>
                 </li>
                 <li className="flex items-center gap-2">
                   <ChevronRight className="h-3 w-3 text-orange-400" />
-                  <Link to="/pg-list?location=sports-complex" className="footer-link hover:text-orange-400">
+                  <Link to="/properties?location=sports-complex" className="footer-link hover:text-orange-400">
                     Sports Complex
                   </Link>
                 </li>
                 <li className="flex items-center gap-2">
                   <ChevronRight className="h-3 w-3 text-orange-400" />
-                  <Link to="/pg-list?type=girls-pg" className="footer-link hover:text-orange-400">
-                    Girls PG Zone
+                  <Link to="/properties?type=girls" className="footer-link hover:text-orange-400">
+                    Girls PG
                   </Link>
                 </li>
                 <li className="flex items-center gap-2">
                   <ChevronRight className="h-3 w-3 text-orange-400" />
-                  <Link to="/pg-list?type=boys-pg" className="footer-link hover:text-orange-400">
-                    Boys PG Zone
+                  <Link to="/properties?type=boys" className="footer-link hover:text-orange-400">
+                    Boys PG
+                  </Link>
+                </li>
+                <li className="flex items-center gap-2">
+                  <ChevronRight className="h-3 w-3 text-orange-400" />
+                  <Link to="/properties?type=family" className="footer-link hover:text-orange-400">
+                    Family Flats
                   </Link>
                 </li>
               </ul>
             </div>
 
-            {/* Contact - KEPT SAME BUT ADDED ROUTES */}
+            {/* Contact */}
             <div>
               <h4 className="footer-title text-lg font-semibold text-orange-400">Contact</h4>
               <ul className="mt-4 space-y-2 text-sm text-gray-400">
@@ -1064,13 +1299,14 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Bottom Bar - FIXED WITH CORRECT ROUTES */}
-          <div className="footer-bottom mt-10 flex flex-col items-center justify-between gap-4 border-t border-white/10 py-4 text-sm text-gray-400 md:flex-row">
+          {/* Bottom Bar */}
+          <div className="footer-bottom mt-8 md:mt-10 flex flex-col items-center justify-between gap-4 border-t border-white/10 py-4 text-sm text-gray-400 md:flex-row">
             <p>&copy; {new Date().getFullYear()} EasyToRent. All rights reserved.</p>
-            <div className="flex gap-6">
+            <div className="flex flex-wrap justify-center gap-4 md:gap-6">
               <Link to="/privacy" className="hover:text-orange-400 transition-colors">Privacy</Link>
               <Link to="/terms" className="hover:text-orange-400 transition-colors">Terms</Link>
               <Link to="/refund" className="hover:text-orange-400 transition-colors">Refund</Link>
+              <Link to="/sitemap" className="hover:text-orange-400 transition-colors">Sitemap</Link>
             </div>
             <div className="flex items-center gap-2">
               <span className="status-indicator"></span>
@@ -1080,10 +1316,11 @@ export function Footer() {
         </div>
 
         {/* Live Chat Button */}
-        <div className="fixed bottom-6 right-6 z-50">
+        <div className="fixed bottom-4 md:bottom-6 right-4 md:right-6 z-50">
           <button onClick={handleLiveChat} className="live-support-btn">
-            <MessageSquare className="h-5 w-5" />
-            <span>Live Support</span>
+            <MessageSquare className="h-4 w-4 md:h-5 md:w-5" />
+            <span className="hidden sm:inline">Live Support</span>
+            <span className="sm:hidden">Support</span>
           </button>
           {unreadCount > 0 && (
             <div className="unread-badge">{unreadCount}</div>
@@ -1092,18 +1329,19 @@ export function Footer() {
 
         {/* Chat Window */}
         {showChat && (
-          <div className={`chat-window ${isMinimized ? 'minimized' : ''}`}>
+          <div className={`chat-window ${isMinimized ? 'minimized' : ''}`} ref={chatRef}>
             <div className="chat-header" onClick={() => setIsMinimized(!isMinimized)}>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-500">
-                    <Bot className="h-5 w-5 text-white" />
+                <div className="flex items-center gap-2 md:gap-3">
+                  <div className="flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-full bg-orange-500">
+                    <Bot className="h-4 w-4 md:h-5 md:w-5 text-white" />
                   </div>
                   <div>
-                    <h3 className="font-semibold">EasyToRent Support</h3>
+                    <h3 className="font-semibold text-sm md:text-base">EasyToRent Support</h3>
                     <div className="flex items-center gap-1 text-xs opacity-90">
                       <span className="status-indicator"></span>
-                      <span>Riya Sharma</span>
+                      <span className="hidden sm:inline">Riya Sharma</span>
+                      <span className="sm:hidden">Online</span>
                     </div>
                   </div>
                 </div>
@@ -1116,13 +1354,13 @@ export function Footer() {
                     }} 
                     className={`header-btn ${showSettings ? 'active' : ''}`}
                   >
-                    <Settings className="h-4 w-4" />
+                    <Settings className="h-3 w-3 md:h-4 md:w-4" />
                   </button>
                   <button onClick={(e) => { e.stopPropagation(); toggleMinimize(); }} className="header-btn">
-                    {isMinimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
+                    {isMinimized ? <Maximize2 className="h-3 w-3 md:h-4 md:w-4" /> : <Minimize2 className="h-3 w-3 md:h-4 md:w-4" />}
                   </button>
                   <button onClick={(e) => { e.stopPropagation(); handleLiveChat(); }} className="header-btn">
-                    <X className="h-4 w-4" />
+                    <X className="h-3 w-3 md:h-4 md:w-4" />
                   </button>
                 </div>
               </div>
@@ -1140,7 +1378,7 @@ export function Footer() {
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="search-input"
                     />
-                    <Search className="search-icon h-4 w-4" />
+                    <Search className="search-icon h-3 w-3 md:h-4 md:w-4" />
                   </div>
 
                   {/* Attachments Preview */}
@@ -1164,12 +1402,12 @@ export function Footer() {
                           {message.isAgent && <span className="agent-status"></span>}
                         </div>
                         <div className={`message-bubble ${message.isAgent ? 'agent-message' : 'user-message'} ${message.isSystem ? 'system-message' : ''}`}>
-                          <div className="whitespace-pre-line text-sm">{message.text}</div>
+                          <div className="whitespace-pre-line text-xs md:text-sm">{message.text}</div>
                           <div className="message-time">{message.time}</div>
                           {message.isAgent && (
                             <div className="message-actions">
                               <button className="message-action-btn" onClick={() => handleCopyMessage(message.text)}>
-                                <Copy className="h-3 w-3" />
+                                <Copy className="h-2 w-2 md:h-3 md:w-3" />
                               </button>
                             </div>
                           )}
@@ -1178,7 +1416,8 @@ export function Footer() {
                     ))}
                     {isTyping && (
                       <div className="typing-indicator">
-                        <span className="text-xs mr-2">Agent is typing</span>
+                        <span className="text-xs mr-2 hidden sm:inline">Agent is typing</span>
+                        <span className="text-xs mr-2 sm:hidden">Typing...</span>
                         <div className="typing-dot"></div>
                         <div className="typing-dot"></div>
                         <div className="typing-dot"></div>
@@ -1201,38 +1440,38 @@ export function Footer() {
 
                   {/* Contact Panel */}
                   <div className="contact-panel">
-                    <h4 className="font-semibold mb-2 flex items-center gap-2">
-                      <Phone className="h-4 w-4 text-orange-500" />
+                    <h4 className="font-semibold mb-2 flex items-center gap-2 text-sm">
+                      <Phone className="h-3 w-3 md:h-4 md:w-4 text-orange-500" />
                       Direct Contact
                     </h4>
                     <div className="contact-item">
-                      <Phone className="h-4 w-4" />
-                      <a href="tel:+919315058665">+91 93150 58665</a>
+                      <Phone className="h-3 w-3 md:h-4 md:w-4" />
+                      <a href="tel:+919315058665" className="text-xs md:text-sm">+91 93150 58665</a>
                     </div>
                     <div className="contact-item">
-                      <Mail className="h-4 w-4" />
-                      <a href="mailto:supporteasytorent@gmail.com">supporteasytorent@gmail.com</a>
+                      <Mail className="h-3 w-3 md:h-4 md:w-4" />
+                      <a href="mailto:supporteasytorent@gmail.com" className="text-xs md:text-sm break-all">supporteasytorent@gmail.com</a>
                     </div>
                   </div>
                 </div>
 
                 {/* Input Area */}
                 <div className="chat-input-area">
-                  {/* Settings Menu - FIXED POSITIONING */}
+                  {/* Settings Menu */}
                   {showSettings && (
                     <div className="settings-menu" ref={settingsRef}>
                       <div className="settings-item" onClick={() => setIsMuted(!isMuted)}>
-                        {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-                        <span>{isMuted ? 'Unmute Notifications' : 'Mute Notifications'}</span>
+                        {isMuted ? <VolumeX className="h-3 w-3 md:h-4 md:w-4" /> : <Volume2 className="h-3 w-3 md:h-4 md:w-4" />}
+                        <span className="text-xs md:text-sm">{isMuted ? 'Unmute' : 'Mute'}</span>
                       </div>
                       <div className="settings-item" onClick={clearChat}>
-                        <Trash2 className="h-4 w-4" />
-                        <span>Clear Chat History</span>
+                        <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                        <span className="text-xs md:text-sm">Clear Chat</span>
                       </div>
                       <div className="settings-divider"></div>
                       <div className="settings-item" onClick={handleLiveChat}>
-                        <LogOut className="h-4 w-4" />
-                        <span>Close Chat</span>
+                        <LogOut className="h-3 w-3 md:h-4 md:w-4" />
+                        <span className="text-xs md:text-sm">Close</span>
                       </div>
                     </div>
                   )}
@@ -1262,7 +1501,7 @@ export function Footer() {
                       value={userMessage}
                       onChange={(e) => setUserMessage(e.target.value)}
                       onKeyDown={handleKeyPress}
-                      placeholder="Type your message..."
+                      placeholder={isMobile ? "Message..." : "Type your message..."}
                       className="chat-input"
                       rows={1}
                     />
@@ -1271,13 +1510,13 @@ export function Footer() {
                         className="input-action-btn"
                         onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                       >
-                        <Smile className="h-4 w-4" />
+                        <Smile className="h-3 w-3 md:h-4 md:w-4" />
                       </button>
                       <button 
                         className="input-action-btn"
                         onClick={() => fileInputRef.current?.click()}
                       >
-                        <Paperclip className="h-4 w-4" />
+                        <Paperclip className="h-3 w-3 md:h-4 md:w-4" />
                       </button>
                       <input
                         type="file"
@@ -1292,8 +1531,8 @@ export function Footer() {
                       className="send-btn" 
                       disabled={!userMessage.trim()}
                     >
-                      <Send className="h-4 w-4" />
-                      <span>Send</span>
+                      <Send className="h-3 w-3 md:h-4 md:w-4" />
+                      <span className="hidden sm:inline">Send</span>
                     </button>
                   </div>
                 </div>

@@ -23,6 +23,13 @@ import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import AdminPanel from "./pages/AdminPanel";
 import OwnerDashboard from "./pages/OwnerDashboard";
+
+// Missing imports - add these
+import HowItWorks from "./pages/how-it-works";
+import Blog from "./pages/Blog";
+import Refund from "./pages/Refund";
+import RegisterPropertyPage from "./pages/RegisterPropertyPage";
+
 import { useAuth } from "./contexts/AuthContext";
 import { Navigate, useLocation } from "react-router-dom";
 
@@ -69,6 +76,13 @@ const App = () => (
                 <Route path="/faq" element={<RoleGate><FAQ /></RoleGate>} />
                 <Route path="/terms" element={<RoleGate><Terms /></RoleGate>} />
                 <Route path="/privacy" element={<RoleGate><Privacy /></RoleGate>} />
+                
+                {/* ================= New Routes Added ================= */}
+                <Route path="/how-it-works" element={<RoleGate><HowItWorks /></RoleGate>} />
+                <Route path="/blog" element={<RoleGate><Blog /></RoleGate>} />
+                <Route path="/refund" element={<RoleGate><Refund /></RoleGate>} />
+                <Route path="/register-property" element={<RoleGate><RegisterPropertyPage /></RoleGate>} />
+                <Route path="/list-property" element={<RoleGate><RegisterPropertyPage /></RoleGate>} />
 
                 {/* ================= Admin Routes ================= */}
                 <Route path="/admin" element={<RoleGate><AdminPanel /></RoleGate>} />
@@ -80,7 +94,6 @@ const App = () => (
                 <Route path="*" element={<RoleGate><NotFound /></RoleGate>} />
               </Routes>
             </BrowserRouter>
-
           </CompareProvider>
         </WishlistProvider>
       </AuthProvider>
