@@ -33,6 +33,12 @@ import {
   Star,
   MoreVertical,
   Key,
+  Edit,
+  Save,
+  XCircle as CancelIcon,
+  Plus,
+  Trash,
+  AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { api, User } from '@/services/api';
@@ -46,6 +52,34 @@ interface ActivityLog {
   timestamp: string;
   ipAddress: string;
   details?: Record<string, any>;
+}
+
+interface Location {
+  city: string;
+  state: string;
+  country: string;
+  timezone: string;
+  address?: string;
+  pincode?: string;
+  coordinates?: {
+    lat: number;
+    lng: number;
+  };
+}
+
+interface UserWithLocation extends User {
+  location?: Location;
+  lastLogin?: string;
+  phone?: string;
+  status: 'active' | 'inactive' | 'suspended';
+}
+
+interface EditUserData {
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  location: Location;
 }
 
 // ────────────────── Status Badge Component ──────────────────
@@ -81,8 +115,8 @@ const RoleBadge = ({ role }: { role: string }) => {
 };
 
 // ────────────────── Location Badge Component ──────────────────
-const LocationBadge = ({ location }: { location?: string }) => {
-  if (!location) {
+const LocationBadge = ({ location }: { location?: Location }) => {
+  if (!location || !location.city) {
     return (
       <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-gray-100 text-gray-500 text-xs">
         <Globe className="h-3 w-3" />
@@ -94,7 +128,7 @@ const LocationBadge = ({ location }: { location?: string }) => {
   return (
     <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs border border-blue-200">
       <MapPin className="h-3 w-3" />
-      {location}
+      {location.city}, {location.state}
     </span>
   );
 };
@@ -154,8 +188,308 @@ const ConfirmModal = ({ isOpen, title, message, confirmText, variant, loading, o
   );
 };
 
+// ────────────────── Edit User Modal ──────────────────
+interface EditUserModalProps {
+  isOpen: boolean;
+  user: UserWithLocation | null;
+  loading: boolean;
+  onSave: (data: EditUserData) => Promise<void>;
+  onClose: () => void;
+}
+
+const EditUserModal = ({ isOpen, user, loading, onSave, onClose }: EditUserModalProps) => {
+  const [formData, setFormData] = useState<EditUserData>({
+    name: '',
+    email: '',
+    phone: '',
+    role: 'user',
+    location: {
+      city: '',
+      state: '',
+      country: 'India',
+      timezone: 'IST',
+      address: '',
+      pincode: '',
+    },
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        name: user.name || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        role: user.role || 'user',
+        location: user.location || {
+          city: '',
+          state: '',
+          country: 'India',
+          timezone: 'IST',
+          address: '',
+          pincode: '',
+        },
+      });
+    }
+  }, [user]);
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    
+    if (!formData.name.trim()) newErrors.name = 'Name is required';
+    if (!formData.email.trim()) newErrors.email = 'Email is required';
+    if (!formData.email.includes('@')) newErrors.email = 'Invalid email format';
+    if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
+    if (!formData.location.city.trim()) newErrors.city = 'City is required';
+    if (!formData.location.state.trim()) newErrors.state = 'State is required';
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (validateForm()) {
+      await onSave(formData);
+    }
+  };
+
+  if (!isOpen || !user) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+        <div className="sticky top-0 bg-white border-b border-gray-100 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Edit User</h3>
+              <p className="text-sm text-gray-500 mt-1">Update user information and location details</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+            >
+              <X className="h-5 w-5 text-gray-500" />
+            </button>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Basic Information */}
+          <div>
+            <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <UserCircle className="h-5 w-5 text-purple-500" />
+              Basic Information
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Full Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className={`w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition-all ${
+                    errors.name ? 'border-red-500' : 'border-gray-200'
+                  }`}
+                  placeholder="Enter full name"
+                />
+                {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email Address <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className={`w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition-all ${
+                    errors.email ? 'border-red-500' : 'border-gray-200'
+                  }`}
+                  placeholder="Enter email address"
+                />
+                {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Phone Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className={`w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition-all ${
+                    errors.phone ? 'border-red-500' : 'border-gray-200'
+                  }`}
+                  placeholder="Enter phone number"
+                />
+                {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Role
+                </label>
+                <select
+                  value={formData.role}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
+                >
+                  <option value="user">User</option>
+                  <option value="owner">Owner</option>
+                  <option value="moderator">Moderator</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Location Information */}
+          <div>
+            <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-purple-500" />
+              Location Details
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Address <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.location.address}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    location: { ...formData.location, address: e.target.value }
+                  })}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
+                  placeholder="Street address"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  City <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.location.city}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    location: { ...formData.location, city: e.target.value }
+                  })}
+                  className={`w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-purple-500 outline-none ${
+                    errors.city ? 'border-red-500' : 'border-gray-200'
+                  }`}
+                  placeholder="City"
+                />
+                {errors.city && <p className="text-xs text-red-500 mt-1">{errors.city}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  State <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.location.state}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    location: { ...formData.location, state: e.target.value }
+                  })}
+                  className={`w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-purple-500 outline-none ${
+                    errors.state ? 'border-red-500' : 'border-gray-200'
+                  }`}
+                  placeholder="State"
+                />
+                {errors.state && <p className="text-xs text-red-500 mt-1">{errors.state}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Country
+                </label>
+                <input
+                  type="text"
+                  value={formData.location.country}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    location: { ...formData.location, country: e.target.value }
+                  })}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
+                  placeholder="Country"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  PIN Code
+                </label>
+                <input
+                  type="text"
+                  value={formData.location.pincode}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    location: { ...formData.location, pincode: e.target.value }
+                  })}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
+                  placeholder="PIN code"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Timezone
+                </label>
+                <select
+                  value={formData.location.timezone}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    location: { ...formData.location, timezone: e.target.value }
+                  })}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
+                >
+                  <option value="IST">IST (UTC+5:30)</option>
+                  <option value="EST">EST (UTC-5:00)</option>
+                  <option value="PST">PST (UTC-8:00)</option>
+                  <option value="GMT">GMT (UTC+0:00)</option>
+                  <option value="CST">CST (UTC+8:00)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Form Actions */}
+          <div className="flex gap-3 pt-4 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-4 py-2.5 rounded-xl bg-purple-600 text-white font-medium hover:bg-purple-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+              <Save className="h-4 w-4" />
+              Save Changes
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 // ────────────────── User Detail Drawer ──────────────────
-const UserDetailDrawer = ({ user, onClose }: { user: User | null; onClose: () => void }) => {
+const UserDetailDrawer = ({ user, onClose, onEdit }: { user: UserWithLocation | null; onClose: () => void; onEdit: () => void }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'activity' | 'bookings' | 'reviews'>('overview');
 
   if (!user) return null;
@@ -168,6 +502,7 @@ const UserDetailDrawer = ({ user, onClose }: { user: User | null; onClose: () =>
       action: 'Login',
       timestamp: new Date().toISOString(),
       ipAddress: '192.168.1.1',
+      details: { device: 'Chrome on Windows' }
     },
     {
       id: '2',
@@ -175,6 +510,7 @@ const UserDetailDrawer = ({ user, onClose }: { user: User | null; onClose: () =>
       action: 'Profile Update',
       timestamp: new Date(Date.now() - 86400000).toISOString(),
       ipAddress: '192.168.1.1',
+      details: { field: 'Location' }
     },
   ];
 
@@ -223,21 +559,24 @@ const UserDetailDrawer = ({ user, onClose }: { user: User | null; onClose: () =>
             <div className="space-y-6">
               {/* Profile Header */}
               <div className="flex items-start gap-6">
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white text-3xl font-bold shadow-lg shadow-orange-500/20">
+                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-3xl font-bold shadow-lg">
                   {user.name?.charAt(0)?.toUpperCase() || 'U'}
                 </div>
                 <div className="flex-1">
                   <div className="flex items-start justify-between">
                     <div>
                       <h4 className="text-2xl font-bold text-gray-900">{user.name}</h4>
-                      <div className="flex items-center gap-2 mt-2">
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
                         <RoleBadge role={user.role} />
                         <StatusBadge status={user.status || 'active'} />
                       </div>
                     </div>
-                    <button className="px-4 py-2 text-sm border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-2">
-                      <Download className="h-4 w-4" />
-                      Export Profile
+                    <button
+                      onClick={onEdit}
+                      className="px-4 py-2 text-sm bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors flex items-center gap-2 shadow-sm"
+                    >
+                      <Edit className="h-4 w-4" />
+                      Edit Profile
                     </button>
                   </div>
                 </div>
@@ -251,24 +590,36 @@ const UserDetailDrawer = ({ user, onClose }: { user: User | null; onClose: () =>
                   </div>
                   <h5 className="font-semibold text-blue-900">Location Information</h5>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-blue-600 mb-1">City</p>
-                    <p className="font-medium text-blue-900">Mumbai</p>
+                {user.location ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-blue-600 mb-1">Address</p>
+                      <p className="font-medium text-blue-900">{user.location.address || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-blue-600 mb-1">City</p>
+                      <p className="font-medium text-blue-900">{user.location.city || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-blue-600 mb-1">State</p>
+                      <p className="font-medium text-blue-900">{user.location.state || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-blue-600 mb-1">Country</p>
+                      <p className="font-medium text-blue-900">{user.location.country || 'India'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-blue-600 mb-1">PIN Code</p>
+                      <p className="font-medium text-blue-900">{user.location.pincode || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-blue-600 mb-1">Timezone</p>
+                      <p className="font-medium text-blue-900">{user.location.timezone || 'IST'}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-blue-600 mb-1">State</p>
-                    <p className="font-medium text-blue-900">Maharashtra</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-blue-600 mb-1">Country</p>
-                    <p className="font-medium text-blue-900">India</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-blue-600 mb-1">Timezone</p>
-                    <p className="font-medium text-blue-900">IST (UTC+5:30)</p>
-                  </div>
-                </div>
+                ) : (
+                  <p className="text-blue-600">No location information available</p>
+                )}
               </div>
 
               {/* Contact Information */}
@@ -336,12 +687,8 @@ const UserDetailDrawer = ({ user, onClose }: { user: User | null; onClose: () =>
                     <span className="text-sm font-mono text-gray-900">{user._id}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-500">Last IP Address</span>
-                    <span className="text-sm font-mono text-gray-900">192.168.1.1</span>
-                  </div>
-                  <div className="flex justify-between">
                     <span className="text-sm text-gray-500">Account Type</span>
-                    <span className="text-sm text-gray-900">Standard</span>
+                    <span className="text-sm text-gray-900">{user.role === 'admin' ? 'Administrator' : user.role === 'owner' ? 'Property Owner' : 'Standard User'}</span>
                   </div>
                 </div>
               </div>
@@ -364,6 +711,11 @@ const UserDetailDrawer = ({ user, onClose }: { user: User | null; onClose: () =>
                       <Globe className="h-3 w-3" />
                       {activity.ipAddress}
                     </span>
+                    {activity.details && (
+                      <span className="text-gray-400">
+                        {Object.entries(activity.details).map(([key, value]) => `${key}: ${value}`).join(', ')}
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -394,16 +746,18 @@ const AdminPanel = () => {
   const { user, isAuthenticated, isLoading: authLoading, logout } = useAuth();
   const navigate = useNavigate();
 
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserWithLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
-  const [statusChangeTarget, setStatusChangeTarget] = useState<{ user: User; newStatus: string } | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserWithLocation | null>(null);
+  const [editingUser, setEditingUser] = useState<UserWithLocation | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<UserWithLocation | null>(null);
+  const [statusChangeTarget, setStatusChangeTarget] = useState<{ user: UserWithLocation; newStatus: string } | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Check admin access
   useEffect(() => {
@@ -416,12 +770,30 @@ const AdminPanel = () => {
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await api.getAllUsers();
       if (response.success && response.data) {
-        setUsers(response.data.items || []);
+        // Add location data from API response or use default
+        const usersWithLocation = (response.data.items || []).map((u: any) => ({
+          ...u,
+          location: u.location || {
+            city: u.city || '',
+            state: u.state || '',
+            country: u.country || 'India',
+            timezone: u.timezone || 'IST',
+            address: u.address || '',
+            pincode: u.pincode || '',
+          },
+          status: u.status || 'active',
+        }));
+        setUsers(usersWithLocation);
+        toast.success('Users loaded successfully');
+      } else {
+        throw new Error(response.message || 'Failed to fetch users');
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to fetch users';
+      setError(message);
       toast.error(message);
     } finally {
       setLoading(false);
@@ -445,17 +817,62 @@ const AdminPanel = () => {
     return matchesSearch && matchesRole && matchesStatus;
   });
 
+  const handleUpdateUser = async (userId: string, updateData: Partial<UserWithLocation>) => {
+    try {
+      setActionLoading(true);
+      const response = await api.updateUser(userId, updateData);
+      if (response.success) {
+        setUsers((prev) => prev.map((u) => 
+          u._id === userId ? { ...u, ...updateData } : u
+        ));
+        toast.success('User updated successfully');
+        return true;
+      } else {
+        throw new Error(response.message || 'Failed to update user');
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to update user';
+      toast.error(message);
+      return false;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleEditUser = async (formData: EditUserData) => {
+    if (!editingUser) return;
+    
+    const success = await handleUpdateUser(editingUser._id, {
+      name: formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      role: formData.role,
+      location: formData.location,
+    });
+    
+    if (success) {
+      setEditingUser(null);
+      setSelectedUser(null);
+    }
+  };
+
   const handleDeleteUser = async () => {
     if (!deleteTarget) return;
     setActionLoading(true);
     try {
       const response = await api.deleteUser(deleteTarget._id);
       if (response.success) {
-        toast.success(response.message);
+        toast.success(response.message || 'User deleted successfully');
         setUsers((prev) => prev.filter((u) => u._id !== deleteTarget._id));
+        if (selectedUser?._id === deleteTarget._id) {
+          setSelectedUser(null);
+        }
+      } else {
+        throw new Error(response.message || 'Failed to delete user');
       }
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : 'Failed to delete user');
+      const message = error instanceof Error ? error.message : 'Failed to delete user';
+      toast.error(message);
     } finally {
       setActionLoading(false);
       setDeleteTarget(null);
@@ -468,11 +885,18 @@ const AdminPanel = () => {
     try {
       const response = await api.updateUserStatus(statusChangeTarget.user._id, statusChangeTarget.newStatus);
       if (response.success) {
-        toast.success(response.message);
-        setUsers((prev) => prev.map((u) => (u._id === statusChangeTarget.user._id ? { ...u, status: statusChangeTarget.newStatus } : u)));
+        toast.success(response.message || `User ${statusChangeTarget.newStatus === 'active' ? 'activated' : 'suspended'} successfully`);
+        setUsers((prev) => prev.map((u) => 
+          u._id === statusChangeTarget.user._id 
+            ? { ...u, status: statusChangeTarget.newStatus as 'active' | 'inactive' | 'suspended' } 
+            : u
+        ));
+      } else {
+        throw new Error(response.message || 'Failed to update status');
       }
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : 'Failed to update status');
+      const message = error instanceof Error ? error.message : 'Failed to update status';
+      toast.error(message);
     } finally {
       setActionLoading(false);
       setStatusChangeTarget(null);
@@ -481,13 +905,34 @@ const AdminPanel = () => {
 
   // Export users data
   const handleExportData = () => {
-    const dataStr = JSON.stringify(users, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-    const exportFileDefaultName = `users-export-${new Date().toISOString()}.json`;
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileDefaultName);
-    linkElement.click();
+    try {
+      const exportData = users.map(u => ({
+        id: u._id,
+        name: u.name,
+        email: u.email,
+        phone: u.phone,
+        role: u.role,
+        status: u.status,
+        city: u.location?.city,
+        state: u.location?.state,
+        country: u.location?.country,
+        pincode: u.location?.pincode,
+        joined: u.createdAt,
+        lastLogin: u.lastLogin,
+      }));
+      
+      const dataStr = JSON.stringify(exportData, null, 2);
+      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+      const exportFileDefaultName = `users-export-${new Date().toISOString().split('T')[0]}.json`;
+      const linkElement = document.createElement('a');
+      linkElement.setAttribute('href', dataUri);
+      linkElement.setAttribute('download', exportFileDefaultName);
+      linkElement.click();
+      
+      toast.success(`Exported ${users.length} users successfully`);
+    } catch (error) {
+      toast.error('Failed to export data');
+    }
   };
 
   // Stats
@@ -558,6 +1003,25 @@ const AdminPanel = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* ── Error Alert ── */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm text-red-700">{error}</p>
+              <button
+                onClick={() => setError(null)}
+                className="text-xs text-red-600 hover:text-red-800 mt-1"
+              >
+                Dismiss
+              </button>
+            </div>
+            <button onClick={fetchUsers} className="text-red-600 hover:text-red-800 text-sm font-medium">
+              Retry
+            </button>
+          </div>
+        )}
+
         {/* ── Stats Cards ── */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           {[
@@ -663,12 +1127,13 @@ const AdminPanel = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5">Sort By</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5">Location</label>
                   <select className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none">
-                    <option>Recent First</option>
-                    <option>Oldest First</option>
-                    <option>Name A-Z</option>
-                    <option>Name Z-A</option>
+                    <option>All Locations</option>
+                    <option>Mumbai</option>
+                    <option>Delhi</option>
+                    <option>Bangalore</option>
+                    <option>Chennai</option>
                   </select>
                 </div>
               </div>
@@ -725,6 +1190,9 @@ const AdminPanel = () => {
                     <div className="min-w-0">
                       <p className="font-semibold text-gray-900 truncate">{u.name}</p>
                       <p className="text-xs text-gray-400 truncate lg:hidden">{u.email}</p>
+                      <div className="hidden lg:block">
+                        <LocationBadge location={u.location} />
+                      </div>
                     </div>
                   </div>
 
@@ -765,6 +1233,14 @@ const AdminPanel = () => {
                       <Eye className="h-4 w-4" />
                     </button>
 
+                    <button
+                      onClick={() => setEditingUser(u)}
+                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="Edit User"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </button>
+
                     {u.role !== 'admin' && (
                       <>
                         <button
@@ -797,6 +1273,11 @@ const AdminPanel = () => {
                     <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors lg:hidden">
                       <MoreVertical className="h-4 w-4" />
                     </button>
+                  </div>
+
+                  {/* Mobile Location Badge */}
+                  <div className="lg:hidden mt-2">
+                    <LocationBadge location={u.location} />
                   </div>
                 </div>
               ))}
@@ -857,7 +1338,24 @@ const AdminPanel = () => {
         onCancel={() => setStatusChangeTarget(null)}
       />
 
-      <UserDetailDrawer user={selectedUser} onClose={() => setSelectedUser(null)} />
+      <EditUserModal
+        isOpen={!!editingUser}
+        user={editingUser}
+        loading={actionLoading}
+        onSave={handleEditUser}
+        onClose={() => setEditingUser(null)}
+      />
+
+      <UserDetailDrawer 
+        user={selectedUser} 
+        onClose={() => setSelectedUser(null)}
+        onEdit={() => {
+          if (selectedUser) {
+            setEditingUser(selectedUser);
+            setSelectedUser(null);
+          }
+        }}
+      />
     </div>
   );
 };

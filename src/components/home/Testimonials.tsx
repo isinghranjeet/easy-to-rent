@@ -233,7 +233,7 @@ export function Testimonials() {
   };
 
   // YouTube embed URL
-  const embedUrl = `https://www.youtube.com/embed/${youtubeVideo.youtubeId}?autoplay=1&rel=0&modestbranding=1`;
+const embedUrl = `https://www.youtube.com/embed/X2yjpkoOQDo?rel=0&modestbranding=1&controls=1&disablekb=1`;
 
   return (
     <>
