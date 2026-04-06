@@ -394,7 +394,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // src/services/api.ts
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://eassy-to-rent-backend.onrender.com';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://18.207.243.172:10000/api';
 
 // ────────────────────── Types ──────────────────────
 export interface User {
