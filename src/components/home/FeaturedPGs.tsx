@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Star, AlertCircle, Heart, Shield, Home, Wifi } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -37,231 +37,197 @@ interface PGListing {
 
 const staysPerType = 3;
 
+const initialState = {
+  girls: [],
+  boys: [],
+  family: [],
+  'co-ed': [],
+};
+
 export function FeaturedPGs() {
-  const [staysByType, setStaysByType] = useState<Record<string, PGListing[]>>({
-    girls: [],
-    boys: [],
-    family: [],
-    'co-ed': [],
-  });
+  const [staysByType, setStaysByType] = useState<Record<string, PGListing[]>>(initialState);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    fetchStays();
-  }, []);
-
-  const fetchStays = async () => {
+  // 🔥 Optimized Fetch
+  const fetchStays = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
-      
-      const result = await api.request<{
-        success: boolean;
-        data?: { items: RawPGData[] } | RawPGData[];
-        items?: RawPGData[];
-        message?: string;
-      }>('/api/pg?limit=20');
 
-      let rawPgs: RawPGData[] = [];
-      if (result.success) {
-        if (result.data?.items && Array.isArray(result.data.items)) rawPgs = result.data.items;
-        else if (Array.isArray(result.data)) rawPgs = result.data;
-        else if (Array.isArray(result.items)) rawPgs = result.items;
-      } else {
-        throw new Error(result.message || 'Failed to fetch accommodations');
+      const result = await api.request<any>('/api/pg?limit=20');
+
+      const rawPgs: RawPGData[] =
+        result?.data?.items ||
+        result?.data ||
+        result?.items ||
+        [];
+
+      if (!Array.isArray(rawPgs)) throw new Error('Invalid API response');
+
+      const grouped = {
+        girls: [] as PGListing[],
+        boys: [] as PGListing[],
+        family: [] as PGListing[],
+        'co-ed': [] as PGListing[],
+      };
+
+      for (const raw of rawPgs) {
+        const stay = transformPGData(raw);
+
+        if (stay.published === false) continue;
+
+        if (grouped[stay.type]) {
+          grouped[stay.type].push(stay);
+        }
       }
 
-      const stays: PGListing[] = rawPgs.map(transformPGData);
-      const publishedStays = stays.filter(stay => stay.published !== false);
+      // 🔥 Sorting once per type
+      const sortFn = (a: PGListing, b: PGListing) => {
+        if (a.featured !== b.featured) return a.featured ? -1 : 1;
+        if (a.rating !== b.rating) return b.rating - a.rating;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      };
 
-      if (publishedStays.length === 0) {
-        setError('No accommodations found');
-        setStaysByType({ girls: [], boys: [], family: [], 'co-ed': [] });
-        return;
-      }
-
-      const sortStays = (stays: PGListing[]) =>
-        [...stays].sort((a, b) => {
-          const ratingA = a.rating || 0;
-          const ratingB = b.rating || 0;
-          if (a.featured && !b.featured) return -1;
-          if (!a.featured && b.featured) return 1;
-          if (ratingA !== ratingB) return ratingB - ratingA;
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        });
-
-      setStaysByType({
-        girls: sortStays(publishedStays.filter(s => s.type === 'girls')).slice(0, staysPerType),
-        boys: sortStays(publishedStays.filter(s => s.type === 'boys')).slice(0, staysPerType),
-        family: sortStays(publishedStays.filter(s => s.type === 'family')).slice(0, staysPerType),
-        'co-ed': sortStays(publishedStays.filter(s => s.type === 'co-ed')).slice(0, staysPerType),
+      Object.keys(grouped).forEach((key) => {
+        grouped[key] = grouped[key].sort(sortFn).slice(0, staysPerType);
       });
+
+      setStaysByType(grouped);
+
+      if (!Object.values(grouped).some(arr => arr.length)) {
+        setError('No accommodations found');
+      }
+
     } catch (err: any) {
-      console.error('Error fetching accommodations:', err);
+      console.error(err);
       setError('Failed to load accommodations');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const transformForCard = (stay: PGListing) => ({
-    id: stay._id || stay.id || '',
-    name: stay.name,
-    slug: stay.slug || stay._id,
-    description: stay.description,
-    price: stay.price,
-    images: stay.images || [],
-    gallery: stay.gallery || [],
-    city: stay.city,
-    locality: stay.locality,
-    type: stay.type,
-    amenities: stay.amenities || [],
-    rating: stay.rating || 0,
-    reviewCount: stay.reviewCount || 0,
-    ownerName: stay.ownerName,
-    ownerPhone: stay.ownerPhone,
-    featured: stay.featured || false,
-    verified: stay.verified || false,
-    wifi: stay.wifi || stay.amenities?.some(a => a.toLowerCase().includes('wifi')) || false,
-    meals: stay.meals || stay.amenities?.some(a => a.toLowerCase().includes('meal')) || false,
-    ac: stay.ac || stay.amenities?.some(a => a.toLowerCase().includes('ac') || a.toLowerCase().includes('air')) || false,
-    parking: stay.parking || stay.amenities?.some(a => a.toLowerCase().includes('park')) || false,
-    distance: stay.distance,
-  });
+  useEffect(() => {
+    fetchStays();
+  }, [fetchStays]);
 
-  const renderSection = (title: string, subtitle: string, icon: React.ReactNode, stays: PGListing[], type: string, badgeText: string) => {
-    if (stays.length === 0) return null;
+  // 🔥 Memoized Card Transform
+  const transformForCard = useCallback((stay: PGListing) => {
+    const amenitiesLower = stay.amenities?.map(a => a.toLowerCase()) || [];
 
-    return (
-      <div className="mb-20 last:mb-0">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
-          <div>
-            <div className="inline-flex items-center gap-2 mb-3 px-4 py-2 bg-orange-100 text-orange-700 rounded-full">
-              {icon}
-              <span className="text-sm font-medium uppercase tracking-wider">{badgeText}</span>
-            </div>
-            <h2 className="font-display text-2xl md:text-3xl font-bold text-gray-900">{title}</h2>
-            <p className="text-gray-600 mt-2">{subtitle}</p>
-          </div>
-          <Link to={`/pg?type=${type}`}>
-            <Button className="gap-2 bg-orange-600 hover:bg-orange-700 text-white shadow-md transition-all duration-300">
-              View All {title.split(' ')[0]} Stays
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </Link>
-        </div>
+    return {
+      id: stay._id,
+      name: stay.name,
+      slug: stay.slug || stay._id,
+      description: stay.description,
+      price: stay.price,
+      images: stay.images || [],
+      gallery: stay.gallery || [],
+      city: stay.city,
+      locality: stay.locality,
+      type: stay.type,
+      amenities: stay.amenities || [],
+      rating: stay.rating || 0,
+      reviewCount: stay.reviewCount || 0,
+      ownerName: stay.ownerName,
+      ownerPhone: stay.ownerPhone,
+      featured: stay.featured,
+      verified: stay.verified,
+      wifi: stay.wifi ?? amenitiesLower.some(a => a.includes('wifi')),
+      meals: stay.meals ?? amenitiesLower.some(a => a.includes('meal')),
+      ac: stay.ac ?? amenitiesLower.some(a => a.includes('ac') || a.includes('air')),
+      parking: stay.parking ?? amenitiesLower.some(a => a.includes('park')),
+      distance: stay.distance,
+    };
+  }, []);
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {stays.map((stay, index) => (
-            <Link key={stay._id || stay.id || index} to={`/pg/${stay._id || stay.id}`} className="w-full group">
-              <div className="relative transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-xl rounded-xl bg-white border border-orange-100 overflow-hidden">
-                {stay.featured && (
-                  <div className="absolute top-3 left-3 z-10">
-                    <div className="inline-flex items-center gap-1 px-3 py-1 bg-orange-500 text-white text-xs font-semibold rounded-full shadow-md">
-                      <Star className="h-3 w-3 fill-white" />
-                      Featured
-                    </div>
-                  </div>
-                )}
-                <PGCard pg={transformForCard(stay)} index={index} />
-              </div>
-            </Link>
-          ))}
-        </div>
-      </div>
-    );
-  };
+  // 🔥 Memoized Sections
+  const sections = useMemo(() => [
+    {
+      title: "Premium Stays for Women",
+      subtitle: "Safe, secure, and comfortable living spaces",
+      icon: <Heart className="h-4 w-4" />,
+      data: staysByType.girls,
+      type: "girls",
+      badge: "Women's Exclusive",
+    },
+    {
+      title: "Executive Stays for Men",
+      subtitle: "Modern residences for professionals",
+      icon: <Shield className="h-4 w-4" />,
+      data: staysByType.boys,
+      type: "boys",
+      badge: "Trending Now",
+    },
+    {
+      title: "Family Residences",
+      subtitle: "Spacious homes for families",
+      icon: <Home className="h-4 w-4" />,
+      data: staysByType.family,
+      type: "family",
+      badge: "Family Friendly",
+    },
+    {
+      title: "Co-living Spaces",
+      subtitle: "Inclusive accommodations",
+      icon: <Wifi className="h-4 w-4" />,
+      data: staysByType['co-ed'],
+      type: "co-ed",
+      badge: "Premium Choice",
+    },
+  ], [staysByType]);
 
-  // ─── Loading Skeleton ──────────────────────────────
+  // 🔥 Loading
   if (loading) {
-    return (
-      <section className="py-16 md:py-24 bg-gradient-to-b from-white to-orange-50/30">
-        <div className="container mx-auto px-4">
-          {[1, 2, 3, 4].map((section) => (
-            <div key={section} className="mb-16 animate-pulse">
-              <div className="h-6 w-32 bg-orange-200 rounded mb-2"></div>
-              <div className="h-8 w-48 bg-orange-200 rounded mb-6"></div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="bg-white border border-orange-100 rounded-xl overflow-hidden">
-                    <div className="h-48 bg-orange-100"></div>
-                    <div className="p-4">
-                      <div className="h-4 bg-orange-100 rounded w-3/4 mb-2"></div>
-                      <div className="h-3 bg-orange-100 rounded w-1/2 mb-4"></div>
-                      <div className="h-8 bg-orange-100 rounded"></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-    );
+    return <div className="p-10 text-center">Loading...</div>;
   }
 
-  // ─── Error ──────────────────────────────
+  // 🔥 Error
   if (error) {
     return (
-      <section className="py-16 md:py-24 bg-gradient-to-b from-white to-orange-50/30">
-        <div className="container mx-auto px-4">
-          <div className="text-center py-12 border-2 border-dashed border-orange-200 rounded-2xl bg-white">
-            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-orange-100 flex items-center justify-center">
-              <AlertCircle className="h-8 w-8 text-orange-600" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Unable to Load Accommodations</h3>
-            <p className="text-muted-foreground mb-6 max-w-md mx-auto">{error}</p>
-            <Button onClick={fetchStays} className="bg-orange-600 hover:bg-orange-700 text-white">
-              Try Again
-            </Button>
-          </div>
-        </div>
-      </section>
+      <div className="text-center p-10">
+        <AlertCircle className="mx-auto mb-4 text-orange-600" />
+        <p>{error}</p>
+        <Button onClick={fetchStays}>Retry</Button>
+      </div>
     );
   }
 
-  // ─── Empty ──────────────────────────────
-  const hasAnyStays = Object.values(staysByType).some(arr => arr.length > 0);
-  if (!hasAnyStays) {
-    return (
-      <section className="py-16 md:py-24 bg-gradient-to-b from-white to-orange-50/30">
-        <div className="container mx-auto px-4">
-          <div className="text-center py-12 border-2 border-dashed border-orange-200 rounded-2xl bg-white">
-            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-orange-100 flex items-center justify-center">
-              <span className="text-2xl">🏠</span>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Accommodations Available</h3>
-            <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              There are no stays available at the moment. Please check back later.
-            </p>
-          </div>
-        </div>
-      </section>
-    );
-  }
-
-  // ─── Render All Sections ──────────────────────────────
   return (
-    <section className="py-16 md:py-24 bg-gradient-to-b from-white to-orange-50/30">
+    <section className="py-16">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center gap-2 mb-3 px-4 py-2 bg-orange-100 text-orange-700 rounded-full border border-orange-200">
-            <Star className="h-4 w-4 fill-orange-500" />
-            <span className="text-sm font-medium uppercase tracking-wider">Premium Living Spaces</span>
-          </div>
-          <h2 className="font-display text-3xl md:text-4xl font-bold text-gray-900 mt-2">
-            Featured Accommodations
-          </h2>
-          <p className="text-gray-600 mt-3 max-w-2xl mx-auto">
-            Discover our handpicked selection of premium stays tailored to your lifestyle needs
-          </p>
-        </div>
 
-        {renderSection("Premium Stays for Women", "Safe, secure, and comfortable living spaces with 24/7 security", <Heart className="h-4 w-4" />, staysByType.girls, "girls", "Women's Exclusive")}
-        {renderSection("Executive Stays for Men", "Modern residences designed for young professionals and students", <Shield className="h-4 w-4" />, staysByType.boys, "boys", "Trending Now")}
-        {renderSection("Family Residences", "Spacious homes away from home for your loved ones", <Home className="h-4 w-4" />, staysByType.family, "family", "Family Friendly")}
-        {renderSection("Co-living Spaces", "Inclusive accommodations for everyone", <Wifi className="h-4 w-4" />, staysByType['co-ed'], "co-ed", "Premium Choice")}
+        {sections.map(section => {
+          if (!section.data.length) return null;
+
+          return (
+            <div key={section.type} className="mb-16">
+
+              <div className="flex justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold">{section.title}</h2>
+                  <p>{section.subtitle}</p>
+                </div>
+
+                <Link to={`/pg?type=${section.type}`}>
+                  <Button>
+                    View All <ArrowRight />
+                  </Button>
+                </Link>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-6">
+                {section.data.map((stay) => (
+                  <Link key={stay._id} to={`/pg/${stay._id}`}>
+                    <PGCard pg={transformForCard(stay)} />
+                  </Link>
+                ))}
+              </div>
+
+            </div>
+          );
+        })}
+
       </div>
     </section>
   );
