@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, MapPin, Users, Loader2 } from "lucide-react";
 
@@ -24,62 +24,95 @@ export function Hero() {
   const [loadingLocations, setLoadingLocations] = useState(true);
   const [locations, setLocations] = useState<string[]>([]);
 
-  // 🎯 College → Location mapping (SEO Friendly)
-  const collegeMap: Record<string, string> = {
-    "Room near Chandigarh University": "Kharar",
-    "Room near Amity University Noida": "Noida",
-    "Room near Galgotias University Noida": "Noida",
-    "Room near NIET Noida": "Noida",
-    "Room near Manav Rachna University Faridabad": "Faridabad",
-    "Room near Lingaya’s Vidyapeeth Faridabad": "Faridabad",
-  };
+  // 🎯 Helper: Capitalize
+  const capitalize = (str: string) =>
+    str.charAt(0).toUpperCase() + str.slice(1);
 
-  // 📡 Fetch Locations
-  useEffect(() => {
-    const fetchLocations = async () => {
-      try {
-        setLoadingLocations(true);
+  // 🎯 College → Location mapping
+  const collegeMap = useMemo(
+    () => ({
+      "Room near Chandigarh University": "Kharar",
+      "Room near Amity University Noida": "Noida",
+      "Room near Galgotias University Noida": "Noida",
+      "Room near NIET Noida": "Noida",
+      "Room near Manav Rachna University Faridabad": "Faridabad",
+      "Room near Lingaya’s Vidyapeeth Faridabad": "Faridabad",
+    }),
+    []
+  );
 
-        const result = await api.request<any>("/api/pg?limit=100");
+  // 📡 Fetch Locations (Optimized)
+  const fetchLocations = useCallback(async () => {
+    try {
+      setLoadingLocations(true);
 
-        const responseData = result.success
-          ? result.data || []
-          : result;
-
-        const listingsData =
-          responseData.items ||
-          (Array.isArray(responseData) ? responseData : []);
-
-        const locationSet = new Set<string>();
-
-        listingsData.forEach((pg: any) => {
-          if (pg.city) locationSet.add(pg.city);
-          if (pg.locality) locationSet.add(pg.locality);
-        });
-
-        setLocations(Array.from(locationSet).sort());
-
-      } catch (error) {
-        console.error("Failed to fetch locations:", error);
-
-        setLocations([
-          "Chandigarh",
-          "Mohali",
-          "Panchkula",
-          "Kharar",
-          "Noida",
-          "Faridabad",
-        ]);
-      } finally {
+      // ✅ 1. Check cache
+      const cached = localStorage.getItem("pg_locations");
+      if (cached) {
+        setLocations(JSON.parse(cached));
         setLoadingLocations(false);
+        return;
       }
-    };
 
-    fetchLocations();
+      const result = await api.request<any>("/api/pg?limit=100");
+
+      const listings =
+        result?.data?.items ||
+        result?.data ||
+        result?.items ||
+        [];
+
+      if (!Array.isArray(listings)) throw new Error("Invalid data");
+
+      const locationSet = new Set<string>();
+
+      // ✅ 2. Normalize + Deduplicate
+      for (const pg of listings) {
+        const city = pg?.city?.trim().toLowerCase();
+        const locality = pg?.locality?.trim().toLowerCase();
+
+        if (city) locationSet.add(capitalize(city));
+        if (locality) locationSet.add(capitalize(locality));
+      }
+
+      // ✅ 3. Popular first + limit
+      const popular = ["Chandigarh", "Mohali", "Kharar"];
+
+      const finalLocations = [
+        ...popular,
+        ...[...locationSet].filter(loc => !popular.includes(loc))
+      ]
+        .sort((a, b) => a.localeCompare(b))
+        .slice(0, 20);
+
+      // ✅ 4. Cache
+      localStorage.setItem("pg_locations", JSON.stringify(finalLocations));
+
+      setLocations(finalLocations);
+
+    } catch (error) {
+      console.error("Failed to fetch locations:", error);
+
+      // fallback
+      setLocations([
+        "Chandigarh",
+        "Mohali",
+        "Panchkula",
+        "Kharar",
+        "Noida",
+        "Faridabad",
+      ]);
+    } finally {
+      setLoadingLocations(false);
+    }
   }, []);
 
+  useEffect(() => {
+    fetchLocations();
+  }, [fetchLocations]);
+
   // 🔍 Search
-  const handleSearch = () => {
+  const handleSearch = useCallback(() => {
     const params = new URLSearchParams();
 
     if (searchQuery) params.set("q", searchQuery);
@@ -87,21 +120,19 @@ export function Hero() {
     if (selectedType) params.set("type", selectedType);
 
     navigate(`/pg?${params.toString()}`);
-  };
+  }, [searchQuery, selectedLocation, selectedType, navigate]);
 
-  // 🎯 College Quick Filter
-  const handleCollegeSelect = (college: string) => {
-    const location = collegeMap[college];
+  // 🎯 College Filter
+  const handleCollegeSelect = useCallback(
+    (college: string) => {
+      const location = collegeMap[college];
+      if (!location) return;
 
-    if (!location) return;
-
-    setSelectedLocation(location);
-
-    const params = new URLSearchParams();
-    params.set("location", location);
-
-    navigate(`/pg?${params.toString()}`);
-  };
+      setSelectedLocation(location);
+      navigate(`/pg?location=${location}`);
+    },
+    [collegeMap, navigate]
+  );
 
   return (
     <section className="relative w-full min-h-[60vh] flex items-center overflow-hidden">
@@ -172,7 +203,7 @@ export function Hero() {
                 </SelectContent>
               </Select>
 
-              {/* ✅ College Dropdown */}
+              {/* College */}
               <Select onValueChange={handleCollegeSelect}>
                 <SelectTrigger className="h-11">
                   <MapPin className="h-4 w-4 mr-2 text-gray-500" />
@@ -205,14 +236,9 @@ export function Hero() {
         </div>
       </div>
 
-      {/* 🌊 Bottom Wave */}
+      {/* Wave */}
       <div className="absolute bottom-0 left-0 w-full overflow-hidden leading-none">
-        <svg
-          viewBox="0 0 1440 120"
-          xmlns="http://www.w3.org/2000/svg"
-          className="w-full h-[80px]"
-          preserveAspectRatio="none"
-        >
+        <svg viewBox="0 0 1440 120" className="w-full h-[80px]" preserveAspectRatio="none">
           <path
             d="M0,96L60,85.3C120,75,240,53,360,42.7C480,32,600,32,720,42.7C840,53,960,75,1080,80C1200,85,1320,75,1380,69.3L1440,64V120H0Z"
             fill="white"

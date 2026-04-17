@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Star, AlertCircle, Heart, Shield, Home, Wifi } from 'lucide-react';
+import { ArrowRight, AlertCircle, Heart, Shield, Home, Wifi } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PGCard } from '@/components/pg/PGCard';
 import { api } from '@/services/api';
@@ -49,7 +49,6 @@ export function FeaturedPGs() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // 🔥 Optimized Fetch
   const fetchStays = useCallback(async () => {
     try {
       setLoading(true);
@@ -82,7 +81,6 @@ export function FeaturedPGs() {
         }
       }
 
-      // 🔥 Sorting once per type
       const sortFn = (a: PGListing, b: PGListing) => {
         if (a.featured !== b.featured) return a.featured ? -1 : 1;
         if (a.rating !== b.rating) return b.rating - a.rating;
@@ -111,7 +109,6 @@ export function FeaturedPGs() {
     fetchStays();
   }, [fetchStays]);
 
-  // 🔥 Memoized Card Transform
   const transformForCard = useCallback((stay: PGListing) => {
     const amenitiesLower = stay.amenities?.map(a => a.toLowerCase()) || [];
 
@@ -141,7 +138,6 @@ export function FeaturedPGs() {
     };
   }, []);
 
-  // 🔥 Memoized Sections
   const sections = useMemo(() => [
     {
       title: "Premium Stays for Women",
@@ -149,7 +145,6 @@ export function FeaturedPGs() {
       icon: <Heart className="h-4 w-4" />,
       data: staysByType.girls,
       type: "girls",
-      badge: "Women's Exclusive",
     },
     {
       title: "Executive Stays for Men",
@@ -157,7 +152,6 @@ export function FeaturedPGs() {
       icon: <Shield className="h-4 w-4" />,
       data: staysByType.boys,
       type: "boys",
-      badge: "Trending Now",
     },
     {
       title: "Family Residences",
@@ -165,7 +159,6 @@ export function FeaturedPGs() {
       icon: <Home className="h-4 w-4" />,
       data: staysByType.family,
       type: "family",
-      badge: "Family Friendly",
     },
     {
       title: "Co-living Spaces",
@@ -173,16 +166,58 @@ export function FeaturedPGs() {
       icon: <Wifi className="h-4 w-4" />,
       data: staysByType['co-ed'],
       type: "co-ed",
-      badge: "Premium Choice",
     },
   ], [staysByType]);
 
-  // 🔥 Loading
+  // ✅ Skeleton Loading
   if (loading) {
-    return <div className="p-10 text-center">Loading...</div>;
+    return (
+      <section className="py-16">
+        <div className="container mx-auto px-4">
+
+          {[1, 2, 3, 4].map((section) => (
+            <div key={section} className="mb-16">
+
+              <div className="flex justify-between mb-6">
+                <div className="space-y-2">
+                  <div className="h-6 w-60 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="h-4 w-40 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+
+                <div className="h-10 w-24 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-6">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="border rounded-xl overflow-hidden shadow-sm">
+
+                    <div className="h-48 w-full bg-gray-200 animate-pulse"></div>
+
+                    <div className="p-4 space-y-3">
+                      <div className="h-4 w-3/4 bg-gray-200 rounded animate-pulse"></div>
+                      <div className="h-3 w-1/2 bg-gray-200 rounded animate-pulse"></div>
+                      <div className="h-4 w-1/4 bg-gray-200 rounded animate-pulse"></div>
+
+                      <div className="flex gap-2">
+                        <div className="h-6 w-10 bg-gray-200 rounded-full animate-pulse"></div>
+                        <div className="h-6 w-10 bg-gray-200 rounded-full animate-pulse"></div>
+                        <div className="h-6 w-10 bg-gray-200 rounded-full animate-pulse"></div>
+                      </div>
+                    </div>
+
+                  </div>
+                ))}
+              </div>
+
+            </div>
+          ))}
+
+        </div>
+      </section>
+    );
   }
 
-  // 🔥 Error
+  // ❌ Error
   if (error) {
     return (
       <div className="text-center p-10">
@@ -193,6 +228,7 @@ export function FeaturedPGs() {
     );
   }
 
+  // ✅ Main UI
   return (
     <section className="py-16">
       <div className="container mx-auto px-4">
