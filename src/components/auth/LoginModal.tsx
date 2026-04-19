@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// src/components/auth/LoginModal.tsx
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -7,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
-import { api, User as ApiUser } from '@/services/api';
+import { api } from '@/services/api';
 import { toast } from 'sonner';
 import { Loader2, Eye, EyeOff, Mail, Lock, User, Phone, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -18,20 +17,12 @@ interface LoginModalProps {
   defaultTab?: 'login' | 'register';
 }
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  phone?: string;
-}
-
 const LoginModal: React.FC<LoginModalProps> = ({ 
   isOpen, 
   onClose, 
   defaultTab = 'login' 
 }) => {
-  const { login: authLogin, register: updateAuthState } = useAuth();
+  const { login: authLogin } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'login' | 'register'>(defaultTab);
@@ -116,7 +107,21 @@ const LoginModal: React.FC<LoginModalProps> = ({
     return Object.keys(errors).length === 0;
   };
 
-  // Login through AuthContext — which uses api.login()
+  // Google Login Handler
+  const handleGoogleLogin = () => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      toast.error('Google Sign-In is not configured');
+      return;
+    }
+    
+    const redirectUri = `${window.location.origin}/auth-callback`;
+    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=email%20profile&access_type=online&prompt=select_account`;
+    
+    window.location.href = googleAuthUrl;
+  };
+
+  // Login through AuthContext
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -124,12 +129,9 @@ const LoginModal: React.FC<LoginModalProps> = ({
     
     try {
       await authLogin(loginData.email, loginData.password);
-      
-      // If we reach here, login was successful (no OTP needed — shouldn't happen now)
       onClose();
       setLoginData({ email: '', password: '' });
     } catch (error: any) {
-      // Check if OTP is required
       if (error.message === 'OTP_REQUIRED') {
         setShowOtpScreen(true);
         toast.success('OTP sent!', { description: 'Check your email for the verification code.' });
@@ -152,12 +154,9 @@ const LoginModal: React.FC<LoginModalProps> = ({
     setError(null);
 
     try {
-      const { api } = await import('@/services/api');
       const response = await api.verifyLoginOtp(loginData.email, otpValue);
 
       if (response.success && response.data) {
-        // The api.verifyLoginOtp already stores the token
-        // Reload user via page refresh to pick up the session
         toast.success('Login successful!', {
           description: `Welcome back, ${response.data.user?.name || 'User'}!`,
         });
@@ -165,7 +164,6 @@ const LoginModal: React.FC<LoginModalProps> = ({
         setOtpValue('');
         onClose();
         setLoginData({ email: '', password: '' });
-        // Force reload to pick up the new auth state
         window.location.reload();
       } else {
         throw new Error('Verification failed');
@@ -200,15 +198,6 @@ const LoginModal: React.FC<LoginModalProps> = ({
       });
 
       if (response.success && response.data) {
-        const { user: userData, token } = response.data;
-        
-        // AuthContext usually handles the state if it has a register function
-        // but here we are calling it manually. Let's ensure the context is updated.
-        if (updateAuthState) {
-          // Assuming AuthContext.register takes token and user as per the implementation in LoginModal previously
-          // Wait, let's check AuthContext register signature again.
-        }
-        
         toast.success('Registration successful!', {
           description: 'Your account has been created successfully.',
         });
@@ -222,7 +211,6 @@ const LoginModal: React.FC<LoginModalProps> = ({
           phone: ''
         });
         
-        // Reload to ensure all components see the new user session
         window.location.reload();
       } else {
         throw new Error(response.message || 'Registration failed');
@@ -239,19 +227,18 @@ const LoginModal: React.FC<LoginModalProps> = ({
     }
   };
 
-  // Fill with existing user from your database
+  // Fill with demo credentials
   const fillDemoCredentials = () => {
     setLoginData({
       email: 'rsinghranjeet7428@gmail.com',
-      password: 'password123' // You'll need to know the actual password
+      password: 'password123'
     });
   };
 
-  // Fill with test credentials
   const fillTestCredentials = () => {
     setLoginData({
       email: 'ranjeet@gmail.com',
-      password: 'password123' // You'll need to know the actual password
+      password: 'password123'
     });
   };
 
@@ -365,235 +352,262 @@ const LoginModal: React.FC<LoginModalProps> = ({
           </div>
         ) : (
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'login' | 'register')}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="login">Login</TabsTrigger>
-            <TabsTrigger value="register">Register</TabsTrigger>
-          </TabsList>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="login">Login</TabsTrigger>
+              <TabsTrigger value="register">Register</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="login">
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="login-email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="login-email"
-                    name="email"
-                    type="email"
-                    placeholder="Enter your email"
-                    value={loginData.email}
-                    onChange={handleLoginChange}
-                    className="pl-10"
-                    required
-                    disabled={isLoading}
-                  />
+            <TabsContent value="login">
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="login-email">Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="login-email"
+                      name="email"
+                      type="email"
+                      placeholder="Enter your email"
+                      value={loginData.email}
+                      onChange={handleLoginChange}
+                      className="pl-10"
+                      required
+                      disabled={isLoading}
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="login-password">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="login-password"
-                    name="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="Enter your password"
-                    value={loginData.password}
-                    onChange={handleLoginChange}
-                    className="pl-10 pr-10"
-                    required
-                    disabled={isLoading}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
+                <div className="space-y-2">
+                  <Label htmlFor="login-password">Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="login-password"
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Enter your password"
+                      value={loginData.password}
+                      onChange={handleLoginChange}
+                      className="pl-10 pr-10"
+                      required
+                      disabled={isLoading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              {error && activeTab === 'login' && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Logging in...
-                  </>
-                ) : (
-                  'Login'
+                {error && activeTab === 'login' && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
                 )}
-              </Button>
 
-              <div className="text-center text-sm text-gray-500">
-                <button
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Logging in...
+                    </>
+                  ) : (
+                    'Login'
+                  )}
+                </Button>
+
+                {/* Divider */}
+                <div className="relative my-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-300"></div>
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                  </div>
+                </div>
+
+                {/* Google Sign In Button */}
+                <Button
                   type="button"
-                  onClick={() => setActiveTab('register')}
-                  className="text-primary hover:underline"
+                  variant="outline"
+                  onClick={handleGoogleLogin}
+                  disabled={isLoading}
+                  className="w-full"
                 >
-                  Don't have an account? Register
-                </button>
-              </div>
-            </form>
-          </TabsContent>
+                  <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                  </svg>
+                  Continue with Google
+                </Button>
 
-          <TabsContent value="register">
-            <form onSubmit={handleRegister} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="register-name">Full Name *</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="register-name"
-                    name="name"
-                    placeholder="Enter your full name"
-                    value={registerData.name}
-                    onChange={handleRegisterChange}
-                    className="pl-10"
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
-                {registerErrors.name && (
-                  <p className="text-xs text-red-500">{registerErrors.name}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="register-email">Email *</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="register-email"
-                    name="email"
-                    type="email"
-                    placeholder="Enter your email"
-                    value={registerData.email}
-                    onChange={handleRegisterChange}
-                    className="pl-10"
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
-                {registerErrors.email && (
-                  <p className="text-xs text-red-500">{registerErrors.email}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="register-phone">Phone Number (Optional)</Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="register-phone"
-                    name="phone"
-                    type="tel"
-                    placeholder="Enter your phone number"
-                    value={registerData.phone}
-                    onChange={handleRegisterChange}
-                    className="pl-10"
-                    disabled={isLoading}
-                  />
-                </div>
-                {registerErrors.phone && (
-                  <p className="text-xs text-red-500">{registerErrors.phone}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="register-password">Password *</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="register-password"
-                    name="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="Create a password (min. 6 characters)"
-                    value={registerData.password}
-                    onChange={handleRegisterChange}
-                    className="pl-10 pr-10"
-                    required
-                    disabled={isLoading}
-                  />
+                <div className="text-center text-sm text-gray-500">
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    onClick={() => setActiveTab('register')}
+                    className="text-primary hover:underline"
                   >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    Don't have an account? Register
                   </button>
                 </div>
-                {registerErrors.password && (
-                  <p className="text-xs text-red-500">{registerErrors.password}</p>
-                )}
-              </div>
+              </form>
+            </TabsContent>
 
-              <div className="space-y-2">
-                <Label htmlFor="register-confirm-password">Confirm Password *</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="register-confirm-password"
-                    name="confirmPassword"
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    placeholder="Confirm your password"
-                    value={registerData.confirmPassword}
-                    onChange={handleRegisterChange}
-                    className="pl-10 pr-10"
-                    required
-                    disabled={isLoading}
-                  />
+            <TabsContent value="register">
+              <form onSubmit={handleRegister} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="register-name">Full Name *</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="register-name"
+                      name="name"
+                      placeholder="Enter your full name"
+                      value={registerData.name}
+                      onChange={handleRegisterChange}
+                      className="pl-10"
+                      required
+                      disabled={isLoading}
+                    />
+                  </div>
+                  {registerErrors.name && (
+                    <p className="text-xs text-red-500">{registerErrors.name}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="register-email">Email *</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="register-email"
+                      name="email"
+                      type="email"
+                      placeholder="Enter your email"
+                      value={registerData.email}
+                      onChange={handleRegisterChange}
+                      className="pl-10"
+                      required
+                      disabled={isLoading}
+                    />
+                  </div>
+                  {registerErrors.email && (
+                    <p className="text-xs text-red-500">{registerErrors.email}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="register-phone">Phone Number (Optional)</Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="register-phone"
+                      name="phone"
+                      type="tel"
+                      placeholder="Enter your phone number"
+                      value={registerData.phone}
+                      onChange={handleRegisterChange}
+                      className="pl-10"
+                      disabled={isLoading}
+                    />
+                  </div>
+                  {registerErrors.phone && (
+                    <p className="text-xs text-red-500">{registerErrors.phone}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="register-password">Password *</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="register-password"
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Create a password (min. 6 characters)"
+                      value={registerData.password}
+                      onChange={handleRegisterChange}
+                      className="pl-10 pr-10"
+                      required
+                      disabled={isLoading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  {registerErrors.password && (
+                    <p className="text-xs text-red-500">{registerErrors.password}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="register-confirm-password">Confirm Password *</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="register-confirm-password"
+                      name="confirmPassword"
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      placeholder="Confirm your password"
+                      value={registerData.confirmPassword}
+                      onChange={handleRegisterChange}
+                      className="pl-10 pr-10"
+                      required
+                      disabled={isLoading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  {registerErrors.confirmPassword && (
+                    <p className="text-xs text-red-500">{registerErrors.confirmPassword}</p>
+                  )}
+                </div>
+
+                {error && activeTab === 'register' && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Creating account...
+                    </>
+                  ) : (
+                    'Register'
+                  )}
+                </Button>
+
+                <div className="text-center text-sm text-gray-500">
                   <button
                     type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    onClick={() => setActiveTab('login')}
+                    className="text-primary hover:underline"
                   >
-                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    Already have an account? Login
                   </button>
                 </div>
-                {registerErrors.confirmPassword && (
-                  <p className="text-xs text-red-500">{registerErrors.confirmPassword}</p>
-                )}
-              </div>
-
-              {error && activeTab === 'register' && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Creating account...
-                  </>
-                ) : (
-                  'Register'
-                )}
-              </Button>
-
-              <div className="text-center text-sm text-gray-500">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('login')}
-                  className="text-primary hover:underline"
-                >
-                  Already have an account? Login
-                </button>
-              </div>
-            </form>
-          </TabsContent>
-        </Tabs>
+              </form>
+            </TabsContent>
+          </Tabs>
         )}
 
         <div className="text-xs text-center text-gray-400 mt-4">

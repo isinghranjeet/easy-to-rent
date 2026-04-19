@@ -27,12 +27,15 @@ import OwnerDashboard from "./pages/OwnerDashboard";
 // Missing imports - add these
 import HowItWorks from "./pages/how-it-works";
 import Blog from "./pages/Blog";
-import BlogDetail from "./pages/BlogDetail"; // ✅ ADD THIS - Blog Detail Page
+import BlogDetail from "./pages/BlogDetail";
 import Refund from "./pages/Refund";
 import RegisterPropertyPage from "./pages/RegisterPropertyPage";
 
 // Location Page
 import LocationPage from "./pages/LocationPage";
+
+// ✅ Auth Callback for Google Login
+import AuthCallback from "./pages/AuthCallback";
 
 import { useAuth } from "./contexts/AuthContext";
 import { Navigate, useLocation } from "react-router-dom";
@@ -83,7 +86,7 @@ const App = () => (
                 
                 {/* ================= Blog Routes ================= */}
                 <Route path="/blog" element={<RoleGate><Blog /></RoleGate>} />
-                <Route path="/blog/:slug" element={<RoleGate><BlogDetail /></RoleGate>} /> {/* ✅ ADD THIS */}
+                <Route path="/blog/:slug" element={<RoleGate><BlogDetail /></RoleGate>} />
 
                 {/* ================= New Routes Added ================= */}
                 <Route path="/how-it-works" element={<RoleGate><HowItWorks /></RoleGate>} />
@@ -93,6 +96,9 @@ const App = () => (
 
                 {/* Location Route */}
                 <Route path="/location/:slug" element={<RoleGate><LocationPage /></RoleGate>} />
+
+                {/* ✅ Auth Callback Route (Google Login Redirect) */}
+                <Route path="/auth/callback" element={<AuthCallback />} />
 
                 {/* ================= Admin Routes ================= */}
                 <Route path="/admin" element={<RoleGate><AdminPanel /></RoleGate>} />
