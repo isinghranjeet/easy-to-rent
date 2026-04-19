@@ -27,8 +27,12 @@ import OwnerDashboard from "./pages/OwnerDashboard";
 // Missing imports - add these
 import HowItWorks from "./pages/how-it-works";
 import Blog from "./pages/Blog";
+import BlogDetail from "./pages/BlogDetail"; // ✅ ADD THIS - Blog Detail Page
 import Refund from "./pages/Refund";
 import RegisterPropertyPage from "./pages/RegisterPropertyPage";
+
+// Location Page
+import LocationPage from "./pages/LocationPage";
 
 import { useAuth } from "./contexts/AuthContext";
 import { Navigate, useLocation } from "react-router-dom";
@@ -77,12 +81,18 @@ const App = () => (
                 <Route path="/terms" element={<RoleGate><Terms /></RoleGate>} />
                 <Route path="/privacy" element={<RoleGate><Privacy /></RoleGate>} />
                 
+                {/* ================= Blog Routes ================= */}
+                <Route path="/blog" element={<RoleGate><Blog /></RoleGate>} />
+                <Route path="/blog/:slug" element={<RoleGate><BlogDetail /></RoleGate>} /> {/* ✅ ADD THIS */}
+
                 {/* ================= New Routes Added ================= */}
                 <Route path="/how-it-works" element={<RoleGate><HowItWorks /></RoleGate>} />
-                <Route path="/blog" element={<RoleGate><Blog /></RoleGate>} />
                 <Route path="/refund" element={<RoleGate><Refund /></RoleGate>} />
                 <Route path="/register-property" element={<RoleGate><RegisterPropertyPage /></RoleGate>} />
                 <Route path="/list-property" element={<RoleGate><RegisterPropertyPage /></RoleGate>} />
+
+                {/* Location Route */}
+                <Route path="/location/:slug" element={<RoleGate><LocationPage /></RoleGate>} />
 
                 {/* ================= Admin Routes ================= */}
                 <Route path="/admin" element={<RoleGate><AdminPanel /></RoleGate>} />

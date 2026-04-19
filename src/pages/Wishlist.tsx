@@ -2,7 +2,7 @@
 // src/pages/Wishlist.tsx
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, ArrowLeft, Loader2 } from 'lucide-react';
+import { Heart, ArrowLeft, Loader2, Bell, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useWishlist } from '@/contexts/WishlistContext';
@@ -19,6 +19,7 @@ const Wishlist = () => {
   const [wishlistPGs, setWishlistPGs] = useState<TransformedPG[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sendingReminder, setSendingReminder] = useState(false);
 
   useEffect(() => {
     if (wishlist.length > 0) {
@@ -43,28 +44,36 @@ const Wishlist = () => {
         return;
       }
       
-      // Try to fetch from API
+      // ✅ Better way: Use getWishlist API to fetch all at once
       try {
-        const fetchPromises = wishlist.map(async (id) => {
-          try {
-            const result = await api.request<any>(`/api/pg/${id}`);
-            return result.success ? result.data : result; // Handle both wrapper and direct object
-          } catch (err) {
-            console.error(`Error fetching PG ${id}:`, err);
-            return null;
-          }
-        });
-        
-        const results = await Promise.all(fetchPromises);
-        const validPGs = results.filter(pg => pg !== null);
-        
-        if (validPGs.length > 0) {
-          const transformedPGs = validPGs.map(pg => transformPGData(pg));
+        const response = await api.getWishlist();
+        if (response.success && response.data && response.data.length > 0) {
+          const transformedPGs = response.data.map((pg: any) => transformPGData(pg));
           setWishlistPGs(transformedPGs);
+        } else if (wishlist.length > 0) {
+          // Fallback to individual fetches
+          const fetchPromises = wishlist.map(async (id) => {
+            try {
+              const result = await api.getPGById(id);
+              return result.success ? result.data : null;
+            } catch (err) {
+              console.error(`Error fetching PG ${id}:`, err);
+              return null;
+            }
+          });
+          
+          const results = await Promise.all(fetchPromises);
+          const validPGs = results.filter(pg => pg !== null);
+          
+          if (validPGs.length > 0) {
+            const transformedPGs = validPGs.map(pg => transformPGData(pg));
+            setWishlistPGs(transformedPGs);
+          } else {
+            const mockPGs = generateMockPGs(wishlist);
+            setWishlistPGs(mockPGs);
+          }
         } else {
-          // Fallback to mock data if no valid PGs found
-          const mockPGs = generateMockPGs(wishlist);
-          setWishlistPGs(mockPGs);
+          setWishlistPGs([]);
         }
         
       } catch (err) {
@@ -79,6 +88,44 @@ const Wishlist = () => {
       toast.error('Failed to load wishlist items');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ✅ Send wishlist reminder email using dedicated API method
+  const sendReminder = async () => {
+    if (!isAuthenticated) {
+      toast.error('Please login to send reminder', {
+        description: 'You need to be logged in to receive email reminders',
+      });
+      return;
+    }
+
+    if (wishlistPGs.length === 0) {
+      toast.error('No items in wishlist', {
+        description: 'Add some properties to your wishlist first',
+      });
+      return;
+    }
+
+    try {
+      setSendingReminder(true);
+      // ✅ Use dedicated method
+      const response = await api.sendWishlistReminder();
+      
+      if (response.success) {
+        toast.success('Reminder sent!', {
+          description: `Check your email at ${user?.email} for wishlist reminder`,
+        });
+      } else {
+        throw new Error(response.message || 'Failed to send reminder');
+      }
+    } catch (error: any) {
+      console.error('Send reminder error:', error);
+      toast.error('Failed to send reminder', {
+        description: error.message || 'Please try again later',
+      });
+    } finally {
+      setSendingReminder(false);
     }
   };
 
@@ -181,6 +228,23 @@ const Wishlist = () => {
           </div>
           
           <div className="flex gap-2">
+            {/* Send Reminder Button */}
+            {isAuthenticated && wishlistPGs.length > 0 && (
+              <Button 
+                onClick={sendReminder} 
+                variant="outline" 
+                className="gap-2"
+                disabled={sendingReminder}
+              >
+                {sendingReminder ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Mail className="h-4 w-4" />
+                )}
+                {sendingReminder ? 'Sending...' : 'Send Reminder'}
+              </Button>
+            )}
+            
             <Link to="/pg">
               <Button variant="outline" className="gap-2">
                 <ArrowLeft className="h-4 w-4" />
@@ -264,6 +328,23 @@ const Wishlist = () => {
               ))}
             </div>
 
+            {/* Email Info Banner */}
+            {isAuthenticated && wishlistPGs.length > 0 && (
+              <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <Bell className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-blue-800">
+                      Get email reminders for your wishlist
+                    </p>
+                    <p className="text-xs text-blue-600 mt-1">
+                      Click "Send Reminder" to receive an email with all your saved properties at {user?.email}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Empty state note if some items failed to load */}
             {wishlist.length > wishlistPGs.length && (
               <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -279,5 +360,4 @@ const Wishlist = () => {
   );
 };
 
-// ✅ IMPORTANT: Make sure this default export exists!
 export default Wishlist;

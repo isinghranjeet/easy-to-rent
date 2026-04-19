@@ -31,9 +31,18 @@ import {
   Search,
   Volume2,
   VolumeX,
-  Trash2
+  Trash2,
+  Loader2
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
+import { api } from "@/services/api";
+
+interface Location {
+  _id: string;
+  name: string;
+  slug: string;
+  pgCount: number;
+}
 
 export function Footer() {
   const [email, setEmail] = useState("");
@@ -59,12 +68,55 @@ export function Footer() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [attachments, setAttachments] = useState([]);
   const [isMobile, setIsMobile] = useState(false);
+  
+  // ✅ NEW: State for popular locations
+  const [popularLocations, setPopularLocations] = useState<Location[]>([]);
+  const [loadingLocations, setLoadingLocations] = useState(true);
 
   const chatEndRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
   const settingsRef = useRef(null);
   const chatRef = useRef(null);
+
+  // ✅ NEW: Fetch popular locations from API
+  useEffect(() => {
+    const fetchPopularLocations = async () => {
+      try {
+        setLoadingLocations(true);
+        const response = await api.getPopularLocations(8);
+        if (response.success && response.data) {
+          setPopularLocations(response.data);
+        } else {
+          // Fallback locations if API fails
+          setPopularLocations([
+            { _id: '1', name: 'University Area', slug: 'university-area', pgCount: 24 },
+            { _id: '2', name: 'City Center', slug: 'city-center', pgCount: 18 },
+            { _id: '3', name: 'Library Road', slug: 'library-road', pgCount: 12 },
+            { _id: '4', name: 'Sports Complex', slug: 'sports-complex', pgCount: 15 },
+            { _id: '5', name: 'Girls PG', slug: 'girls-pg', pgCount: 20 },
+            { _id: '6', name: 'Boys PG', slug: 'boys-pg', pgCount: 22 },
+            { _id: '7', name: 'Family Flats', slug: 'family-flats', pgCount: 10 },
+          ]);
+        }
+      } catch (error) {
+        console.error('Error fetching locations:', error);
+        // Fallback static locations
+        setPopularLocations([
+          { _id: '1', name: 'University Area', slug: 'university-area', pgCount: 24 },
+          { _id: '2', name: 'City Center', slug: 'city-center', pgCount: 18 },
+          { _id: '3', name: 'Library Road', slug: 'library-road', pgCount: 12 },
+          { _id: '4', name: 'Sports Complex', slug: 'sports-complex', pgCount: 15 },
+          { _id: '5', name: 'Girls PG', slug: 'girls-pg', pgCount: 20 },
+          { _id: '6', name: 'Boys PG', slug: 'boys-pg', pgCount: 22 },
+          { _id: '7', name: 'Family Flats', slug: 'family-flats', pgCount: 10 },
+        ]);
+      } finally {
+        setLoadingLocations(false);
+      }
+    };
+    fetchPopularLocations();
+  }, []);
 
   // Check if mobile
   useEffect(() => {
@@ -1137,124 +1189,54 @@ export function Footer() {
               </div>
             </div>
 
+            {/* Quick Links */}
+            <div>
+              <h4 className="footer-title text-lg font-semibold text-orange-400">Quick Links</h4>
+              <ul className="mt-4 space-y-2 text-sm text-gray-400">
+                <li><Link to="/" className="footer-link hover:text-orange-400">Home</Link></li>
+                <li><Link to="/about" className="footer-link hover:text-orange-400">About Us</Link></li>
+                <li><Link to="/how-it-works" className="footer-link hover:text-orange-400">How It Works</Link></li>
+                <li><Link to="/pg" className="footer-link hover:text-orange-400">Properties</Link></li>
+                <li><Link to="/register-property" className="footer-link hover:text-orange-400">List Your Property</Link></li>
+                <li><Link to="/contact" className="footer-link hover:text-orange-400">Contact</Link></li>
+                <li><Link to="/blog" className="footer-link hover:text-orange-400">Blog</Link></li>
+                <li><Link to="/faq" className="footer-link hover:text-orange-400">FAQ</Link></li>
+                <li><Link to="/privacy" className="footer-link hover:text-orange-400">Privacy Policy</Link></li>
+                <li><Link to="/terms" className="footer-link hover:text-orange-400">Terms & Conditions</Link></li>
+                <li><Link to="/refund" className="footer-link hover:text-orange-400">Refund Policy</Link></li>
+              </ul>
+            </div>
 
-
-
-
-            {/* Quick Links - Updated with correct page mappings */}
-<div>
-  <h4 className="footer-title text-lg font-semibold text-orange-400">Quick Links</h4>
-  <ul className="mt-4 space-y-2 text-sm text-gray-400">
-    <li>
-      <Link to="/" className="footer-link hover:text-orange-400">
-        Home
-      </Link>
-    </li>
-    <li>
-      <Link to="/about" className="footer-link hover:text-orange-400">
-        About Us
-      </Link>
-    </li>
-    <li>
-      <Link to="/how-it-works" className="footer-link hover:text-orange-400">
-        How It Works
-      </Link>
-    </li>
-    <li>
-      <Link to="/pg-list" className="footer-link hover:text-orange-400">
-        Properties
-      </Link>
-    </li>
-    <li>
-      <Link to="/register-property" className="footer-link hover:text-orange-400">
-        List Your Property
-      </Link>
-    </li>
-    <li>
-      <Link to="/contact" className="footer-link hover:text-orange-400">
-        Contact
-      </Link>
-    </li>
-    <li>
-      <Link to="/blog" className="footer-link hover:text-orange-400">
-        Blog
-      </Link>
-    </li>
-    <li>
-      <Link to="/faq" className="footer-link hover:text-orange-400">
-        FAQ
-      </Link>
-    </li>
-    <li>
-      <Link to="/privacy" className="footer-link hover:text-orange-400">
-        Privacy Policy
-      </Link>
-    </li>
-    <li>
-      <Link to="/terms" className="footer-link hover:text-orange-400">
-        Terms & Conditions
-      </Link>
-    </li>
-    <li>
-      <Link to="/refund" className="footer-link hover:text-orange-400">
-        Refund Policy
-      </Link>
-    </li>
-  </ul>
-</div>
-
-
-
-
-
-
-            {/* Popular Locations */}
+            {/* ✅ DYNAMIC POPULAR LOCATIONS - Database se real data */}
             <div>
               <h4 className="footer-title text-lg font-semibold text-orange-400">Popular Locations</h4>
-              <ul className="mt-4 space-y-2 text-sm text-gray-400">
-                <li className="flex items-center gap-2">
-                  <ChevronRight className="h-3 w-3 text-orange-400" />
-                  <Link to="/properties?location=university-area" className="footer-link hover:text-orange-400">
-                    University Area
-                  </Link>
-                </li>
-                <li className="flex items-center gap-2">
-                  <ChevronRight className="h-3 w-3 text-orange-400" />
-                  <Link to="/properties?location=city-center" className="footer-link hover:text-orange-400">
-                    City Center
-                  </Link>
-                </li>
-                <li className="flex items-center gap-2">
-                  <ChevronRight className="h-3 w-3 text-orange-400" />
-                  <Link to="/properties?location=library-road" className="footer-link hover:text-orange-400">
-                    Library Road
-                  </Link>
-                </li>
-                <li className="flex items-center gap-2">
-                  <ChevronRight className="h-3 w-3 text-orange-400" />
-                  <Link to="/properties?location=sports-complex" className="footer-link hover:text-orange-400">
-                    Sports Complex
-                  </Link>
-                </li>
-                <li className="flex items-center gap-2">
-                  <ChevronRight className="h-3 w-3 text-orange-400" />
-                  <Link to="/properties?type=girls" className="footer-link hover:text-orange-400">
-                    Girls PG
-                  </Link>
-                </li>
-                <li className="flex items-center gap-2">
-                  <ChevronRight className="h-3 w-3 text-orange-400" />
-                  <Link to="/properties?type=boys" className="footer-link hover:text-orange-400">
-                    Boys PG
-                  </Link>
-                </li>
-                <li className="flex items-center gap-2">
-                  <ChevronRight className="h-3 w-3 text-orange-400" />
-                  <Link to="/properties?type=family" className="footer-link hover:text-orange-400">
-                    Family Flats
-                  </Link>
-                </li>
-              </ul>
+              {loadingLocations ? (
+                <div className="mt-4 space-y-2">
+                  {[1, 2, 3, 4, 5, 6].map(i => (
+                    <div key={i} className="flex items-center gap-2">
+                      <Loader2 className="h-3 w-3 text-orange-400 animate-spin" />
+                      <div className="h-4 w-24 bg-gray-700 rounded animate-pulse"></div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <ul className="mt-4 space-y-2 text-sm text-gray-400">
+                  {popularLocations.map((location) => (
+                    <li key={location._id} className="flex items-center gap-2 group">
+                      <ChevronRight className="h-3 w-3 text-orange-400 group-hover:translate-x-1 transition" />
+                      <Link 
+                        to={`/location/${location.slug}`} 
+                        className="footer-link hover:text-orange-400 flex justify-between w-full"
+                      >
+                        <span>{location.name}</span>
+                        <span className="text-xs text-gray-500 group-hover:text-orange-400">
+                          {location.pgCount} PGs
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             {/* Contact */}

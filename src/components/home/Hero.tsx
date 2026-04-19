@@ -22,13 +22,15 @@ export function Hero() {
   const [selectedLocation, setSelectedLocation] = useState("");
   const [selectedType, setSelectedType] = useState("");
   const [loadingLocations, setLoadingLocations] = useState(true);
-  const [locations, setLocations] = useState<string[]>([]);
+  const [locations, setLocations] = useState<
+    { name: string; slug: string }[]
+  >([]);
 
-  // 🎯 Helper: Capitalize
+  // 🎯 Capitalize helper
   const capitalize = (str: string) =>
     str.charAt(0).toUpperCase() + str.slice(1);
 
-  // 🎯 College → Location mapping
+  // 🎯 College mapping
   const collegeMap = useMemo(
     () => ({
       "Room near Chandigarh University": "Kharar",
@@ -41,66 +43,72 @@ export function Hero() {
     []
   );
 
-  // 📡 Fetch Locations (Optimized)
+  // 📡 Fetch Locations
   const fetchLocations = useCallback(async () => {
     try {
       setLoadingLocations(true);
 
-      // ✅ 1. Check cache
-      const cached = localStorage.getItem("pg_locations");
+      // Cache check
+      const cached = localStorage.getItem("pg_locations_v2");
       if (cached) {
-        setLocations(JSON.parse(cached));
-        setLoadingLocations(false);
-        return;
+        const parsed = JSON.parse(cached);
+        if (Date.now() - parsed.timestamp < 5 * 60 * 1000) {
+          setLocations(parsed.data);
+          setLoadingLocations(false);
+          return;
+        }
       }
 
-      const result = await api.request<any>("/api/pg?limit=100");
+      const response = await api.getPopularLocations(20);
 
-      const listings =
-        result?.data?.items ||
-        result?.data ||
-        result?.items ||
-        [];
+      let locationData = [];
 
-      if (!Array.isArray(listings)) throw new Error("Invalid data");
+      if (response.success && response.data?.length > 0) {
+        locationData = response.data.map((loc: any) => ({
+          name: capitalize(loc.name),
+          slug: loc.slug,
+        }));
+      } else {
+        // fallback
+        const pgResult = await api.request<any>("/api/pg?limit=100");
+        const listings =
+          pgResult?.data?.items ||
+          pgResult?.data ||
+          pgResult?.items ||
+          [];
 
-      const locationSet = new Set<string>();
+        const locationSet = new Set<string>();
 
-      // ✅ 2. Normalize + Deduplicate
-      for (const pg of listings) {
-        const city = pg?.city?.trim().toLowerCase();
-        const locality = pg?.locality?.trim().toLowerCase();
+        for (const pg of listings) {
+          const city = pg?.city?.trim();
+          if (city) locationSet.add(city);
+        }
 
-        if (city) locationSet.add(capitalize(city));
-        if (locality) locationSet.add(capitalize(locality));
+        locationData = Array.from(locationSet).map((name) => ({
+          name: capitalize(name),
+          slug: name.toLowerCase().replace(/ /g, "-"),
+        }));
       }
 
-      // ✅ 3. Popular first + limit
-      const popular = ["Chandigarh", "Mohali", "Kharar"];
+      // cache save
+      localStorage.setItem(
+        "pg_locations_v2",
+        JSON.stringify({
+          data: locationData,
+          timestamp: Date.now(),
+        })
+      );
 
-      const finalLocations = [
-        ...popular,
-        ...[...locationSet].filter(loc => !popular.includes(loc))
-      ]
-        .sort((a, b) => a.localeCompare(b))
-        .slice(0, 20);
-
-      // ✅ 4. Cache
-      localStorage.setItem("pg_locations", JSON.stringify(finalLocations));
-
-      setLocations(finalLocations);
-
+      setLocations(locationData);
     } catch (error) {
       console.error("Failed to fetch locations:", error);
 
-      // fallback
+      // fallback static
       setLocations([
-        "Chandigarh",
-        "Mohali",
-        "Panchkula",
-        "Kharar",
-        "Noida",
-        "Faridabad",
+        { name: "Chandigarh", slug: "chandigarh" },
+        { name: "Mohali", slug: "mohali" },
+        { name: "Panchkula", slug: "panchkula" },
+        { name: "Kharar", slug: "kharar" },
       ]);
     } finally {
       setLoadingLocations(false);
@@ -111,7 +119,7 @@ export function Hero() {
     fetchLocations();
   }, [fetchLocations]);
 
-  // 🔍 Search
+  // 🔍 Search handler
   const handleSearch = useCallback(() => {
     const params = new URLSearchParams();
 
@@ -122,7 +130,7 @@ export function Hero() {
     navigate(`/pg?${params.toString()}`);
   }, [searchQuery, selectedLocation, selectedType, navigate]);
 
-  // 🎯 College Filter
+  // 🎯 College select
   const handleCollegeSelect = useCallback(
     (college: string) => {
       const location = collegeMap[college];
@@ -134,9 +142,17 @@ export function Hero() {
     [collegeMap, navigate]
   );
 
+  // 🎯 Location select
+  const handleLocationSelect = useCallback(
+    (locationName: string) => {
+      setSelectedLocation(locationName);
+      navigate(`/pg?location=${encodeURIComponent(locationName)}`);
+    },
+    [navigate]
+  );
+
   return (
     <section className="relative w-full min-h-[60vh] flex items-center overflow-hidden">
-
       {/* Background */}
       <div className="absolute inset-0 hero-gradient opacity-95" />
 
@@ -169,20 +185,27 @@ export function Hero() {
               </div>
 
               {/* Location */}
-              <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+              <Select
+                value={selectedLocation || "all"}
+                onValueChange={(val) =>
+                  handleLocationSelect(val === "all" ? "" : val)
+                }
+              >
                 <SelectTrigger className="h-11">
                   <MapPin className="h-4 w-4 mr-2 text-gray-500" />
                   <SelectValue placeholder="Location" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">All Locations</SelectItem>
+
                   {loadingLocations ? (
                     <div className="flex justify-center py-4">
-                      <Loader2 className="animate-spin" />
+                      <Loader2 className="animate-spin h-5 w-5" />
                     </div>
                   ) : (
                     locations.map((loc) => (
-                      <SelectItem key={loc} value={loc}>
-                        {loc}
+                      <SelectItem key={loc.slug} value={loc.name}>
+                        {loc.name}
                       </SelectItem>
                     ))
                   )}
@@ -190,12 +213,18 @@ export function Hero() {
               </Select>
 
               {/* Type */}
-              <Select value={selectedType} onValueChange={setSelectedType}>
+              <Select
+                value={selectedType || "all"}
+                onValueChange={(val) =>
+                  setSelectedType(val === "all" ? "" : val)
+                }
+              >
                 <SelectTrigger className="h-11">
                   <Users className="h-4 w-4 mr-2 text-gray-500" />
                   <SelectValue placeholder="Type" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
                   <SelectItem value="boys">Boys PG</SelectItem>
                   <SelectItem value="girls">Girls PG</SelectItem>
                   <SelectItem value="co-ed">Co-ed PG</SelectItem>
@@ -203,7 +232,7 @@ export function Hero() {
                 </SelectContent>
               </Select>
 
-              {/* College */}
+              {/* Colleges */}
               <Select onValueChange={handleCollegeSelect}>
                 <SelectTrigger className="h-11">
                   <MapPin className="h-4 w-4 mr-2 text-gray-500" />

@@ -75,6 +75,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         setUser(response.data.user);
+        
+        // ✅ Dispatch event for wishlist to sync
+        window.dispatchEvent(new CustomEvent('userLoggedIn'));
+        
         toast.success('Login successful!', {
           description: `Welcome back, ${response.data.user.name}!`,
         });
@@ -104,6 +108,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (response.success && response.data) {
         setUser(response.data.user);
+        
+        // ✅ Dispatch event for wishlist to sync
+        window.dispatchEvent(new CustomEvent('userLoggedIn'));
+        
         toast.success('Registration successful!', {
           description: `Welcome, ${response.data.user.name}!`,
         });
@@ -124,6 +132,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await api.logout();
       setUser(null);
+      
+      // ✅ Dispatch event for wishlist to clear
+      window.dispatchEvent(new CustomEvent('userLoggedOut'));
+      
       toast.success('Logged out successfully');
     } catch (error) {
       console.error('Logout error:', error);

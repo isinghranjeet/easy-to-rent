@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
 
     <!-- ✅ GOOGLE SEARCH CONSOLE VERIFICATION -->
     <meta
@@ -20,6 +20,7 @@
       content="Find verified PGs and rooms near Chandigarh University. No brokerage, easy booking with EassyToRent."
     />
     <meta name="author" content="Ranjeet Singh" />
+    <meta name="keywords" content="PG near Chandigarh University, hostel, paying guest, rooms for rent, student accommodation" />
 
     <!-- OPEN GRAPH (WhatsApp / Facebook / LinkedIn) -->
     <meta
@@ -31,10 +32,10 @@
       content="Book verified PGs & rooms near Chandigarh University. Trusted listings, zero brokerage."
     />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://www.eassytorent.in.net" />
+    <meta property="og:url" content="https://www.easytorent.in" />
     <meta
       property="og:image"
-      content="https://www.eassytorent.in.net/preview.png"
+      content="https://www.easytorent.in/preview.png"
     />
 
     <!-- TWITTER -->
@@ -49,12 +50,97 @@
     />
     <meta
       name="twitter:image"
-      content="https://www.eassytorent.in.net/preview.png"
+      content="https://www.easytorent.in/preview.png"
     />
+
+    <!-- ✅ LEAFLET MAP CSS & JS (OpenStreetMap - FREE) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="preconnect" href="https://unpkg.com" />
+    
+    <!-- ✅ Leaflet JavaScript - Load defer for better performance -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+
+    <!-- ✅ Additional Map Tile Styles (Optional - Better looking maps) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+
+    <!-- ✅ PWA Support (Optional - Make website installable) -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#f97316" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    
+    <!-- ✅ Preconnect for faster loading -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    
+    <!-- ✅ Custom Font (Optional) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet" />
   </head>
 
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- ✅ Leaflet CSS Fix for Marker Icons -->
+    <style>
+      /* Ensure Leaflet maps display correctly */
+      .leaflet-container {
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+      }
+      
+      .leaflet-popup-content {
+        min-width: 200px;
+      }
+      
+      /* Custom marker animation */
+      .custom-marker {
+        transition: transform 0.2s ease;
+      }
+      
+      .custom-marker:hover {
+        transform: scale(1.1);
+        z-index: 1000;
+      }
+      
+      /* User location marker animation */
+      .user-location-marker {
+        animation: pulse 2s infinite;
+      }
+      
+      @keyframes pulse {
+        0% {
+          box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+        }
+        70% {
+          box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+        }
+      }
+      
+      /* Mobile optimizations */
+      @media (max-width: 768px) {
+        .leaflet-control-zoom {
+          bottom: 20px;
+          top: auto !important;
+        }
+        
+        .leaflet-popup-content {
+          min-width: 180px;
+          font-size: 12px;
+        }
+      }
+      
+      /* Loading state for map */
+      .leaflet-control-attribution {
+        font-size: 9px;
+        background: rgba(255,255,255,0.7);
+        padding: 2px 5px;
+        border-radius: 4px;
+      }
+    </style>
   </body>
 </html>

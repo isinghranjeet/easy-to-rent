@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
+import { AirbnbMap } from '@/components/map/AirbnbMap';
+import { PriceAlertButton } from '@/components/pg/PriceAlertButton';
 import { api } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -78,6 +80,19 @@ interface PGListing {
   slug?: string;
   location?: Location;
   nearbyPlaces?: NearbyPlace[];
+  coordinates?: { lat: number; lng: number };
+}
+
+interface DemandMeterData {
+  views: number;
+  weeklyBookings: number;
+  monthlyBookings: number;
+  rating: number;
+  reviewCount: number;
+  demandLevel: string;
+  demandColor: string;
+  demandPercentage: number;
+  demandMessage: string;
 }
 
 const PGDetail = () => {
@@ -97,13 +112,50 @@ const PGDetail = () => {
   });
   const [calculatedPrice, setCalculatedPrice] = useState(0);
   const [totalSavings, setTotalSavings] = useState(0);
+  const [nearbyLocations, setNearbyLocations] = useState<any[]>([]);
   
   const [pg, setPg] = useState<PGListing | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [similarPGs, setSimilarPGs] = useState<any[]>([]);
+  const [nearbyPGs, setNearbyPGs] = useState<any[]>([]);
+  
+  const [demandData, setDemandData] = useState<DemandMeterData>({
+    views: 0,
+    weeklyBookings: 0,
+    monthlyBookings: 0,
+    rating: 4.5,
+    reviewCount: 0,
+    demandLevel: 'Medium',
+    demandColor: 'bg-yellow-500',
+    demandPercentage: 60,
+    demandMessage: '📈 Good interest in this property. Check availability.'
+  });
+  const [loadingDemand, setLoadingDemand] = useState(true);
 
-  // Static phone number (hidden from frontend)
   const STATIC_PHONE = '9315058665';
+
+  const fetchDemandData = async (pgId: string) => {
+    try {
+      setLoadingDemand(true);
+      const response = await api.request(`/api/pg/${pgId}/demand-meter`);
+      if (response.success && response.data) {
+        setDemandData(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching demand data:', error);
+    } finally {
+      setLoadingDemand(false);
+    }
+  };
+
+  const incrementViewCount = async (pgId: string) => {
+    try {
+      await api.request(`/api/pg/${pgId}/increment-view`, { method: 'POST' });
+    } catch (error) {
+      console.error('Error incrementing view:', error);
+    }
+  };
 
   useEffect(() => {
     if (!slug) {
@@ -119,30 +171,35 @@ const PGDetail = () => {
 
         let response;
         
-        // Method 1: Try fetching by slug first
         try {
-          console.log('Attempting to fetch by slug:', slug);
           response = await api.request<any>(`/api/pg/slug/${slug}`);
-          console.log('Found by slug:', response);
         } catch (slugError) {
-          console.log('Not found by slug, trying as ID...', slugError);
-          
-          // Method 2: If slug fails, try as ID
           if (slug.match(/^[0-9a-fA-F]{24}$/)) {
             response = await api.request<any>(`/api/pg/${slug}`);
-            console.log('Found by ID:', response);
           } else {
             throw new Error('PG not found');
           }
         }
         
-        // Handle the response
         if (response?.data) {
           setPg(response.data);
+          await fetchDemandData(response.data._id);
+          await incrementViewCount(response.data._id);
+          
+          if (response.data.city) {
+            fetchSimilarPGs(response.data.city, response.data._id);
+            fetchNearbyLocations(response.data.city);
+            fetchNearbyPGs(response.data.city, response.data._id);
+          }
         } else if (response?.success === false) {
           throw new Error(response.message || "Failed to load PG");
         } else if (response) {
           setPg(response);
+          if (response.city) {
+            fetchSimilarPGs(response.city, response._id);
+            fetchNearbyLocations(response.city);
+            fetchNearbyPGs(response.city, response._id);
+          }
         } else {
           throw new Error("No data received from server");
         }
@@ -156,6 +213,41 @@ const PGDetail = () => {
 
     fetchPG();
   }, [slug]);
+
+  const fetchSimilarPGs = async (city: string, currentId: string) => {
+    try {
+      const response = await api.getPGs({ city, limit: 4 });
+      if (response.success && response.data?.items) {
+        const filtered = response.data.items.filter((pg: any) => pg._id !== currentId);
+        setSimilarPGs(filtered);
+      }
+    } catch (error) {
+      console.error("Error fetching similar PGs:", error);
+    }
+  };
+
+  const fetchNearbyPGs = async (city: string, currentId: string) => {
+    try {
+      const response = await api.getPGs({ city, limit: 20 });
+      if (response.success && response.data?.items) {
+        const filtered = response.data.items.filter((pg: any) => pg._id !== currentId);
+        setNearbyPGs(filtered);
+      }
+    } catch (error) {
+      console.error("Error fetching nearby PGs:", error);
+    }
+  };
+
+  const fetchNearbyLocations = async (city: string) => {
+    try {
+      const response = await api.getLocations({ search: city, limit: 5 });
+      if (response.success && response.data?.locations) {
+        setNearbyLocations(response.data.locations);
+      }
+    } catch (error) {
+      console.error("Error fetching nearby locations:", error);
+    }
+  };
   
   useEffect(() => {
     if (pg) {
@@ -170,7 +262,6 @@ const PGDetail = () => {
   const handleBookingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Create booking message
     const message = encodeURIComponent(
       `*New Booking Request*\n\n` +
       `*PG:* ${pg?.name}\n` +
@@ -186,7 +277,6 @@ const PGDetail = () => {
       `*Message:* ${bookingData.message || 'No additional message'}`
     );
     
-    // Open WhatsApp with booking details
     window.open(`https://wa.me/91${STATIC_PHONE}?text=${message}`, '_blank');
     
     toast.success('Redirecting to WhatsApp for booking!');
@@ -219,7 +309,6 @@ const PGDetail = () => {
 
   const viewOnMap = () => {
     if (!pg) return;
-    
     const address = encodeURIComponent(pg.address);
     window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank');
     toast.info('Opening location on Google Maps');
@@ -227,7 +316,6 @@ const PGDetail = () => {
 
   const getDirections = () => {
     if (!pg) return;
-    
     const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(pg.address)}`;
     window.open(url, '_blank');
     toast.info('Getting directions to this property');
@@ -263,7 +351,6 @@ const PGDetail = () => {
     },
   ] : []);
 
-  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col bg-gradient-to-b from-white to-orange-50/50">
@@ -271,7 +358,7 @@ const PGDetail = () => {
         <main className="flex-1 py-16">
           <div className="container mx-auto px-4">
             <div className="text-center">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mb-4"></div>
               <p className="text-muted-foreground">Loading PG details...</p>
             </div>
           </div>
@@ -281,7 +368,6 @@ const PGDetail = () => {
     );
   }
 
-  // Error state
   if (error || !pg) {
     return (
       <div className="min-h-screen flex flex-col bg-gradient-to-b from-white to-orange-50/50">
@@ -329,6 +415,14 @@ const PGDetail = () => {
               Back to listings
             </Link>
             <div className="flex items-center gap-4">
+              {pg.city && (
+                <Link to={`/location/${pg.city.toLowerCase().replace(/ /g, '-')}`}>
+                  <Badge className="bg-orange-100 text-orange-700 border-orange-200 cursor-pointer hover:bg-orange-200">
+                    <MapPin className="h-3 w-3 mr-1" />
+                    More in {pg.city}
+                  </Badge>
+                </Link>
+              )}
               <Badge className="bg-orange-100 text-orange-700 border-orange-200">
                 <TrendingUp className="h-3 w-3 mr-1" />
                 Trending at CU
@@ -340,7 +434,6 @@ const PGDetail = () => {
         {/* Image Gallery */}
         <div className="container mx-auto px-4 mb-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 h-[400px] md:h-[500px]">
-            {/* Main Image */}
             <div 
               className="md:col-span-2 md:row-span-2 relative rounded-2xl overflow-hidden cursor-pointer group"
               onClick={() => setShowGallery(true)}
@@ -353,7 +446,6 @@ const PGDetail = () => {
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
             </div>
             
-            {/* Thumbnail Images */}
             {pg.images.slice(1, 4).map((image, index) => (
               <div 
                 key={index}
@@ -372,6 +464,41 @@ const PGDetail = () => {
             ))}
           </div>
         </div>
+
+        {/* ✅ VIRTUAL TOUR SECTION */}
+        {(pg.videoUrl || pg.virtualTour) && (
+          <div className="container mx-auto px-4 mb-8">
+            <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
+              <div className="p-4 border-b bg-gradient-to-r from-orange-50 to-red-50">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center">
+                    <svg className="h-4 w-4 text-orange-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M10 8.64L15.27 12 10 15.36V8.64zM8 5v14l11-7-11-7z"/>
+                    </svg>
+                  </div>
+                  <h2 className="text-xl font-bold text-gray-900">Virtual Tour</h2>
+                  <span className="px-2 py-0.5 bg-orange-100 text-orange-600 text-xs rounded-full font-medium">HD</span>
+                </div>
+                <p className="text-sm text-gray-600 mt-1 ml-10">
+                  Take a virtual walkthrough of this property
+                </p>
+              </div>
+              <div className="relative pb-[56.25%] h-0 bg-black">
+                <iframe
+                  src={pg.videoUrl ? pg.videoUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/') : pg.virtualTour}
+                  className="absolute top-0 left-0 w-full h-full"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                  allowFullScreen
+                  title="Virtual Tour of PG"
+                />
+              </div>
+              <div className="p-3 bg-gray-50 text-center text-xs text-gray-500">
+                🎬 Watch this video to get a complete view of the property
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Gallery Modal */}
         {showGallery && (
@@ -417,7 +544,7 @@ const PGDetail = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Left Column - Details */}
             <div className="lg:col-span-2 space-y-8">
-              {/* Header with Enhanced Info */}
+              {/* Header */}
               <div className="bg-white rounded-2xl p-6 shadow-sm border">
                 <div className="flex flex-wrap items-center gap-2 mb-4">
                   <Badge className={cn(
@@ -447,14 +574,14 @@ const PGDetail = () => {
                 </h1>
 
                 <div className="flex flex-wrap items-center gap-4 text-gray-600 mb-6">
-                  <div className="flex items-center gap-2">
+                  <Link to={`/location/${pg.city?.toLowerCase().replace(/ /g, '-')}`} className="flex items-center gap-2 hover:text-orange-600 transition-colors">
                     <MapPin className="h-4 w-4 text-orange-600" />
                     <span className="font-medium">{pg.address}</span>
-                  </div>
+                  </Link>
                   <div className="flex items-center gap-2">
                     <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                    <span className="font-bold text-gray-900">{pg.rating}</span>
-                    <span>({pg.reviewCount} reviews)</span>
+                    <span className="font-bold text-gray-900">{demandData.rating || pg.rating || 4.5}</span>
+                    <span>({demandData.reviewCount || pg.reviewCount || 0} reviews)</span>
                   </div>
                 </div>
 
@@ -477,9 +604,48 @@ const PGDetail = () => {
                     <div className="text-sm text-gray-600">Amenities</div>
                   </div>
                 </div>
+
+                {/* REAL-TIME DEMAND METER */}
+                {!loadingDemand ? (
+                  <div className={`mt-6 bg-gradient-to-r ${demandData.demandLevel === 'Very High' ? 'from-red-50 to-orange-50' : demandData.demandLevel === 'High' ? 'from-orange-50 to-red-50' : 'from-yellow-50 to-orange-50'} rounded-xl p-4`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700">🔥 Demand Meter</span>
+                      <span className={`text-sm font-bold px-2 py-0.5 rounded-full text-white ${
+                        demandData.demandColor === 'bg-red-500' ? 'bg-red-500' : 
+                        demandData.demandColor === 'bg-orange-500' ? 'bg-orange-500' : 
+                        demandData.demandColor === 'bg-yellow-500' ? 'bg-yellow-600' : 'bg-green-500'
+                      }`}>
+                        {demandData.demandLevel} Demand
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className={`${demandData.demandColor} h-2 rounded-full transition-all duration-500`} 
+                        style={{ width: `${demandData.demandPercentage}%` }}
+                      ></div>
+                    </div>
+                    <div className="flex justify-between mt-2 text-xs text-gray-500">
+                      <span>👁️ {demandData.views} views today</span>
+                      <span>📅 {demandData.weeklyBookings} booked this week</span>
+                      <span>⭐ {demandData.rating} rating</span>
+                    </div>
+                    <p className={`text-xs mt-2 ${
+                      demandData.demandLevel === 'Very High' ? 'text-red-600' : 
+                      demandData.demandLevel === 'High' ? 'text-orange-600' : 'text-yellow-600'
+                    }`}>
+                      {demandData.demandMessage}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mt-6 bg-gray-100 rounded-xl p-4 animate-pulse">
+                    <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+                    <div className="h-2 bg-gray-200 rounded w-full mb-2"></div>
+                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                  </div>
+                )}
               </div>
 
-              {/* Tabs Navigation */}
+              {/* Tabs */}
               <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-4 bg-gray-100 p-1 rounded-xl">
                   <TabsTrigger value="overview" className="rounded-lg data-[state=active]:bg-white">
@@ -496,14 +662,13 @@ const PGDetail = () => {
                   </TabsTrigger>
                 </TabsList>
 
-                {/* Overview Tab */}
                 <TabsContent value="overview" className="mt-6">
                   <div className="bg-white rounded-xl p-6 border">
                     <h2 className="text-xl font-bold text-gray-900 mb-4">About this PG</h2>
-                    <p className="text-gray-700 mb-6">{pg.description}</p>
+                    <p className="text-gray-700 mb-6">{pg.description || "No description available."}</p>
                     
                     <div>
-                      <h3 className="font-bold text-gray-900 mb-2">Features</h3>
+                      <h3 className="font-bold text-gray-900 mb-2">Key Features</h3>
                       <div className="grid grid-cols-2 gap-2">
                         {pg.amenities.slice(0, 6).map((amenity, index) => (
                           <div key={index} className="flex items-center gap-2">
@@ -516,7 +681,6 @@ const PGDetail = () => {
                   </div>
                 </TabsContent>
 
-                {/* Amenities Tab */}
                 <TabsContent value="amenities" className="mt-6">
                   <div className="bg-white rounded-xl p-6 border">
                     <h2 className="text-xl font-bold text-gray-900 mb-6">All Amenities</h2>
@@ -536,7 +700,6 @@ const PGDetail = () => {
                   </div>
                 </TabsContent>
 
-                {/* Rooms Tab */}
                 <TabsContent value="rooms" className="mt-6">
                   <div className="bg-white rounded-xl p-6 border">
                     <h2 className="text-xl font-bold text-gray-900 mb-6">Available Rooms</h2>
@@ -578,12 +741,10 @@ const PGDetail = () => {
                   </div>
                 </TabsContent>
 
-                {/* Location Tab */}
                 <TabsContent value="location" className="mt-6">
                   <div className="bg-white rounded-xl p-6 border">
                     <h2 className="text-xl font-bold text-gray-900 mb-6">Location</h2>
                     
-                    {/* Address Section */}
                     <div className="mb-8 p-4 bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl">
                       <div className="flex items-start gap-4">
                         <div className="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
@@ -603,7 +764,6 @@ const PGDetail = () => {
                       </div>
                     </div>
 
-                    {/* Map Action Buttons */}
                     <div className="grid grid-cols-2 gap-3 mb-8">
                       <Button 
                         onClick={viewOnMap}
@@ -622,39 +782,21 @@ const PGDetail = () => {
                       </Button>
                     </div>
 
-                    {/* Nearby Places from Database */}
-                    {pg.nearbyPlaces && pg.nearbyPlaces.length > 0 && (
+                    {nearbyPGs.length > 0 && (
                       <div className="mb-8">
-                        <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                          <Building className="h-4 w-4 text-orange-600" />
-                          Nearby Places
-                        </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {pg.nearbyPlaces.map((place, index) => (
-                            <div key={index} className="p-3 bg-gray-50 rounded-lg flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
-                                {place.type === 'university' && <School className="h-4 w-4 text-orange-600" />}
-                                {place.type === 'restaurant' && <Utensils className="h-4 w-4 text-orange-600" />}
-                                {place.type === 'bus_stop' && <Bus className="h-4 w-4 text-orange-600" />}
-                                {place.type === 'railway_station' && <Train className="h-4 w-4 text-orange-600" />}
-                                {place.type === 'hospital' && <Hospital className="h-4 w-4 text-orange-600" />}
-                                {place.type === 'shopping_mall' && <ShoppingBag className="h-4 w-4 text-orange-600" />}
-                                {place.type === 'cafe' && <Coffee className="h-4 w-4 text-orange-600" />}
-                              </div>
-                              <div>
-                                <p className="font-medium text-gray-900">{place.name}</p>
-                                <div className="flex items-center gap-2 text-sm text-gray-600">
-                                  <span>Distance: {place.distance}</span>
-                                  {place.duration && <span>• {place.duration}</span>}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
+                        <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-orange-600" />
+                          Nearby PGs in {pg.city}
+                        </h3>
+                        <div className="h-[400px] rounded-xl overflow-hidden border">
+                          <AirbnbMap 
+                            listings={[{ ...pg, coordinates: pg.coordinates }, ...nearbyPGs]}
+                            loading={false}
+                          />
                         </div>
                       </div>
                     )}
 
-                    {/* Travel Time Summary */}
                     <div className="p-4 bg-gray-50 rounded-lg">
                       <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
                         <Clock className="h-4 w-4 text-orange-600" />
@@ -662,31 +804,78 @@ const PGDetail = () => {
                       </h4>
                       <div className="grid grid-cols-2 gap-3 text-sm">
                         <div>
-                          <p className="text-gray-600">To CU Gate 1</p>
-                          <p className="font-bold text-gray-900">5 min walk</p>
-                        </div>
-                        <div>
                           <p className="text-gray-600">To City Center</p>
-                          <p className="font-bold text-gray-900">15 min drive</p>
+                          <p className="font-bold text-gray-900">10-15 min drive</p>
                         </div>
                         <div>
                           <p className="text-gray-600">To Railway Station</p>
-                          <p className="font-bold text-gray-900">20 min drive</p>
+                          <p className="font-bold text-gray-900">20-25 min drive</p>
                         </div>
                         <div>
                           <p className="text-gray-600">To Airport</p>
-                          <p className="font-bold text-gray-900">45 min drive</p>
+                          <p className="font-bold text-gray-900">30-35 min drive</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600">To Market</p>
+                          <p className="font-bold text-gray-900">5-10 min walk</p>
                         </div>
                       </div>
                     </div>
                   </div>
                 </TabsContent>
               </Tabs>
+
+              {similarPGs.length > 0 && (
+                <div className="bg-white rounded-xl p-6 border">
+                  <h2 className="text-xl font-bold text-gray-900 mb-4">Similar PGs in {pg.city}</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {similarPGs.map((similarPG) => (
+                      <Link 
+                        key={similarPG._id} 
+                        to={`/pg/${similarPG.slug || similarPG._id}`}
+                        className="flex gap-3 p-3 border rounded-lg hover:border-orange-300 hover:bg-orange-50 transition-all"
+                      >
+                        <img 
+                          src={similarPG.images?.[0] || '/placeholder-image.jpg'} 
+                          alt={similarPG.name}
+                          className="w-20 h-20 rounded-lg object-cover"
+                        />
+                        <div className="flex-1">
+                          <h3 className="font-bold text-gray-900">{similarPG.name}</h3>
+                          <p className="text-sm text-gray-600">{similarPG.address}</p>
+                          <p className="text-orange-600 font-bold mt-1">₹{similarPG.price}/month</p>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                  <div className="mt-4 text-center">
+                    <Link to={`/location/${pg.city?.toLowerCase().replace(/ /g, '-')}`}>
+                      <Button variant="outline" className="border-orange-300 text-orange-600">
+                        View all {pg.city} PGs →
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              )}
+
+              {nearbyLocations.length > 0 && (
+                <div className="bg-white rounded-xl p-6 border">
+                  <h2 className="text-xl font-bold text-gray-900 mb-4">Explore Nearby Areas</h2>
+                  <div className="flex flex-wrap gap-2">
+                    {nearbyLocations.map((loc) => (
+                      <Link key={loc.slug} to={`/location/${loc.slug}`}>
+                        <Badge className="bg-gray-100 text-gray-700 hover:bg-orange-100 hover:text-orange-700 cursor-pointer transition-colors px-3 py-1">
+                          {loc.name} ({loc.pgCount} PGs)
+                        </Badge>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Right Column - Contact & Booking */}
             <div className="space-y-6">
-              {/* Price Calculator Card */}
               <div className="bg-white rounded-2xl p-6 shadow-sm border sticky top-24">
                 <div className="mb-6">
                   <div className="flex items-baseline gap-2 mb-2">
@@ -696,7 +885,6 @@ const PGDetail = () => {
                     <span className="text-gray-600">/month</span>
                   </div>
                   
-                  {/* Booking Duration */}
                   <div className="mt-4">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-gray-700">Duration</span>
@@ -712,7 +900,6 @@ const PGDetail = () => {
                     />
                   </div>
                   
-                  {/* Price Calculation */}
                   <div className="mt-6 space-y-3">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Base ({bookingMonths} months)</span>
@@ -730,7 +917,14 @@ const PGDetail = () => {
                   </div>
                 </div>
 
-                {/* Book Now Button */}
+                <div className="mb-4">
+                  <PriceAlertButton 
+                    pgId={pg._id} 
+                    currentPrice={pg.price}
+                    pgName={pg.name}
+                  />
+                </div>
+
                 <Button 
                   onClick={() => setShowBookingForm(true)} 
                   size="lg" 
@@ -740,7 +934,6 @@ const PGDetail = () => {
                   Book Now
                 </Button>
 
-                {/* Contact Buttons - Without showing number */}
                 <div className="space-y-3 mb-6">
                   <Button 
                     onClick={handlePhoneCall} 
@@ -762,7 +955,6 @@ const PGDetail = () => {
                   </Button>
                 </div>
 
-                {/* Owner Info - Without showing number */}
                 <div className="pt-6 border-t">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-12 h-12 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 flex items-center justify-center">
@@ -776,13 +968,11 @@ const PGDetail = () => {
                   
                   <div className="text-center border-t pt-4">
                     <p className="text-sm text-gray-600 mb-2">Contact for inquiries:</p>
-                    {/* Phone number hidden - just showing available message */}
                     <p className="text-sm text-gray-500">Available 24/7 for your queries</p>
                   </div>
                 </div>
               </div>
 
-              {/* Quick Info Cards */}
               <div className="space-y-3">
                 <div className="bg-white rounded-xl p-4 border">
                   <div className="flex items-center gap-3">

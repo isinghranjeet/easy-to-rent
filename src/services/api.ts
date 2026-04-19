@@ -1,9 +1,3 @@
-
-
-
-
-
-
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // src/services/api.ts
 
@@ -83,7 +77,6 @@ class RequestCache {
   }
 
   getKey(endpoint: string, options: RequestInit = {}): string {
-    // Create unique cache key based on endpoint, method, and body
     const method = options.method || 'GET';
     const body = options.body ? JSON.stringify(options.body) : '';
     return `${method}:${endpoint}:${body}`;
@@ -124,14 +117,12 @@ class RequestCache {
     }
   }
 
-  // For deduplicating simultaneous requests
   getPendingRequest<T>(key: string): Promise<T> | undefined {
     return this.pendingRequests.get(key);
   }
 
   setPendingRequest(key: string, promise: Promise<any>): void {
     this.pendingRequests.set(key, promise);
-    // Clean up after promise resolves
     promise.finally(() => {
       this.pendingRequests.delete(key);
     });
@@ -144,14 +135,13 @@ export class ApiService {
   public baseURL: string;
   private cache: RequestCache;
   private retryCount: number = 3;
-  private retryDelay: number = 1000; // 1 second
+  private retryDelay: number = 1000;
 
   constructor() {
     this.baseURL = API_BASE_URL;
-    this.cache = new RequestCache(5 * 60 * 1000); // 5 minutes cache
+    this.cache = new RequestCache(5 * 60 * 1000);
   }
 
-  // ── Token management ──
   setToken(token: string) {
     this.token = token;
     localStorage.setItem('auth_token', token);
@@ -167,21 +157,21 @@ export class ApiService {
   clearToken() {
     this.token = null;
     localStorage.removeItem('auth_token');
-    // Clear cache on logout
     this.cache.clear();
   }
 
-  // ── Cache management ──
   clearCache() {
     this.cache.clear();
   }
 
   clearPGCache() {
-    // Clear all PG related cache
     this.cache.clearPattern(/\/api\/pg/);
   }
 
-  // ── Retry logic with exponential backoff ──
+  clearWishlistCache() {
+    this.cache.clearPattern(/\/api\/wishlist/);
+  }
+
   private async retryRequest<T>(
     fn: () => Promise<T>,
     retries: number = this.retryCount
@@ -190,7 +180,6 @@ export class ApiService {
       return await fn();
     } catch (error: any) {
       if (retries > 0 && error.status === 429) {
-        // Rate limit hit - wait with exponential backoff
         const delay = this.retryDelay * Math.pow(2, this.retryCount - retries);
         console.log(`⏳ Rate limited, retrying in ${delay}ms... (${retries} retries left)`);
         await new Promise(resolve => setTimeout(resolve, delay));
@@ -200,7 +189,6 @@ export class ApiService {
     }
   }
 
-  // ── Generic request with caching and deduplication ──
   public async request<T>(
     endpoint: string,
     options: RequestInit = {},
@@ -212,20 +200,15 @@ export class ApiService {
     const isFormData = options.body instanceof FormData;
     const method = options.method || 'GET';
     
-    // Create cache key
     const cacheKey = this.cache.getKey(endpoint, options);
-    
-    // Only cache GET requests
     const isGetRequest = method === 'GET';
     
-    // Check cache for GET requests
-    if (isGetRequest && !skipCache) {
+    if (isGetRequest && !skipCache && !endpoint.includes('/api/wishlist')) {
       const cached = this.cache.get<T>(cacheKey);
       if (cached) {
         return cached;
       }
       
-      // Check for pending request (deduplication)
       const pending = this.cache.getPendingRequest<T>(cacheKey);
       if (pending) {
         console.log(`🔄 [REQUEST_DEDUP] ${method} ${url}`);
@@ -249,12 +232,10 @@ export class ApiService {
 
     console.log(`🌐 [API_REQUEST] ${method} ${url}`);
     
-    // Create request promise with retry logic
     const makeRequest = async (): Promise<T> => {
       try {
         const response = await fetch(url, config);
         
-        // Handle non-JSON responses or empty bodies
         const contentType = response.headers.get('content-type');
         let data: any = {};
         
@@ -268,14 +249,12 @@ export class ApiService {
         if (!response.ok) {
           console.warn(`⚠️ [API_ERROR] ${response.status} ${response.statusText} for ${method} ${url}`);
           
-          // Handle rate limiting
           if (response.status === 429) {
             const error: any = new Error(data.message || 'Too many requests');
             error.status = 429;
             throw error;
           }
           
-          // Handle unauthorized
           if (response.status === 401) {
             this.clearToken();
             window.dispatchEvent(new Event('unauthorized'));
@@ -287,8 +266,7 @@ export class ApiService {
           throw error;
         }
 
-        // Cache successful GET responses
-        if (isGetRequest) {
+        if (isGetRequest && !endpoint.includes('/api/wishlist')) {
           this.cache.set(cacheKey, data);
         }
 
@@ -299,11 +277,9 @@ export class ApiService {
       }
     };
 
-    // Execute request with retry logic
     const requestPromise = this.retryRequest(makeRequest);
     
-    // Store pending request for deduplication
-    if (isGetRequest) {
+    if (isGetRequest && !endpoint.includes('/api/wishlist')) {
       this.cache.setPendingRequest(cacheKey, requestPromise);
     }
     
@@ -329,6 +305,8 @@ export class ApiService {
 
       const { token, ...userData } = response.data;
       this.setToken(token);
+      this.clearCache();
+      
       return {
         success: true,
         message: response.message,
@@ -351,6 +329,8 @@ export class ApiService {
     if (response.success && response.data) {
       const { token, ...userData } = response.data;
       this.setToken(token);
+      this.clearCache();
+      
       return {
         success: true,
         message: response.message,
@@ -406,30 +386,149 @@ export class ApiService {
 
   async logout(): Promise<void> {
     this.clearToken();
+    this.clearCache();
   }
 
   // ────────────────── Wishlist Endpoints ──────────────────
 
-  async getWishlist(): Promise<ApiResponse<string[]>> {
-    return this.request<ApiResponse<string[]>>('/api/wishlist');
+  async getWishlist(): Promise<ApiResponse<PGListing[]>> {
+    const response = await this.request<ApiResponse<PGListing[]>>('/api/wishlist', {
+      method: 'GET',
+    }, true);
+    
+    if (response.success && !response.data) {
+      response.data = [];
+    }
+    
+    return response;
   }
 
-  async addToWishlist(pgId: string): Promise<ApiResponse<string[]>> {
-    const response = await this.request<ApiResponse<string[]>>(`/api/wishlist/${pgId}`, {
+  async addToWishlist(pgId: string): Promise<ApiResponse<{ message: string }>> {
+    const response = await this.request<ApiResponse<{ message: string }>>('/api/wishlist', {
       method: 'POST',
+      body: JSON.stringify({ pgId }),
     });
-    // Clear PG cache after wishlist update
+    this.clearWishlistCache();
     this.clearPGCache();
     return response;
   }
 
-  async removeFromWishlist(pgId: string): Promise<ApiResponse<string[]>> {
-    const response = await this.request<ApiResponse<string[]>>(`/api/wishlist/${pgId}`, {
+  async removeFromWishlist(pgId: string): Promise<ApiResponse<{ message: string }>> {
+    const response = await this.request<ApiResponse<{ message: string }>>(`/api/wishlist/${pgId}`, {
       method: 'DELETE',
     });
-    // Clear PG cache after wishlist update
+    this.clearWishlistCache();
     this.clearPGCache();
     return response;
+  }
+
+  async clearWishlist(): Promise<ApiResponse<{ message: string }>> {
+    const response = await this.request<ApiResponse<{ message: string }>>('/api/wishlist', {
+      method: 'DELETE',
+    });
+    this.clearWishlistCache();
+    this.clearPGCache();
+    return response;
+  }
+
+  async checkInWishlist(pgId: string): Promise<ApiResponse<{ inWishlist: boolean }>> {
+    return this.request<ApiResponse<{ inWishlist: boolean }>>(`/api/wishlist/check/${pgId}`, {
+      method: 'GET',
+    });
+  }
+
+  // ────────────────── LOCATION ENDPOINTS ──────────────────
+
+  /**
+   * Get all locations with pagination and search
+   * GET /api/locations
+   */
+  async getLocations(params?: { search?: string; page?: number; limit?: number }): Promise<ApiResponse<any>> {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    
+    return this.request(
+      `/api/locations${queryParams.toString() ? `?${queryParams}` : ''}`,
+      { method: 'GET' }
+    );
+  }
+
+  /**
+   * Get popular locations for carousel
+   * GET /api/locations/popular
+   */
+  async getPopularLocations(limit: number = 10): Promise<ApiResponse<any[]>> {
+    return this.request(`/api/locations/popular?limit=${limit}`, { method: 'GET' });
+  }
+
+  /**
+   * Search locations (autocomplete)
+   * GET /api/locations/search?q=keyword
+   */
+  async searchLocations(query: string, limit: number = 10): Promise<ApiResponse<any[]>> {
+    if (!query || query.length < 2) {
+      return { success: true, message: 'No results', data: [] };
+    }
+    return this.request(`/api/locations/search?q=${encodeURIComponent(query)}&limit=${limit}`, { method: 'GET' });
+  }
+
+  /**
+   * Get single location by slug with PGs
+   * GET /api/locations/:slug
+   */
+  async getLocationBySlug(slug: string, params?: { 
+    page?: number; 
+    limit?: number; 
+    sort?: string; 
+    type?: string; 
+    minPrice?: number; 
+    maxPrice?: number 
+  }): Promise<ApiResponse<any>> {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.sort) queryParams.append('sort', params.sort);
+    if (params?.type) queryParams.append('type', params.type);
+    if (params?.minPrice) queryParams.append('minPrice', params.minPrice.toString());
+    if (params?.maxPrice) queryParams.append('maxPrice', params.maxPrice.toString());
+    
+    return this.request(
+      `/api/locations/${slug}${queryParams.toString() ? `?${queryParams}` : ''}`,
+      { method: 'GET' }
+    );
+  }
+
+  /**
+   * Filter PGs by multiple locations
+   * POST /api/locations/filter-pgs
+   */
+  async filterPGsByLocation(filters: {
+    locationIds: string[];
+    minPrice?: number;
+    maxPrice?: number;
+    type?: string;
+    amenities?: string[];
+    page?: number;
+    limit?: number;
+    sort?: string;
+  }): Promise<ApiResponse<any>> {
+    return this.request('/api/locations/filter-pgs', {
+      method: 'POST',
+      body: JSON.stringify(filters),
+    });
+  }
+
+  /**
+   * Calculate distance from user location to PG
+   * POST /api/locations/distance
+   */
+  async calculateDistance(pgId: string, userLat: number, userLng: number): Promise<ApiResponse<any>> {
+    return this.request('/api/locations/distance', {
+      method: 'POST',
+      body: JSON.stringify({ pgId, userLat, userLng }),
+    });
   }
 
   // ────────────────── PG Endpoints with Caching ──────────────────
@@ -437,6 +536,10 @@ export class ApiService {
   async getPGs(params?: Record<string, any>): Promise<ApiResponse<{ items: PGListing[]; total: number }>> {
     const queryString = params ? '?' + new URLSearchParams(params).toString() : '';
     return this.request<ApiResponse<{ items: PGListing[]; total: number }>>(`/api/pg${queryString}`);
+  }
+
+  async getPGById(id: string): Promise<ApiResponse<PGListing>> {
+    return this.request<ApiResponse<PGListing>>(`/api/pg/${id}`);
   }
 
   async getMyListings(): Promise<ApiResponse<{ items: PGListing[]; total: number }>> {
@@ -449,7 +552,6 @@ export class ApiService {
       method: 'POST',
       body,
     });
-    // Clear PG cache after creation
     this.clearPGCache();
     return response;
   }
@@ -460,7 +562,6 @@ export class ApiService {
       method: 'PUT',
       body,
     });
-    // Clear PG cache after update
     this.clearPGCache();
     return response;
   }
@@ -469,7 +570,6 @@ export class ApiService {
     const response = await this.request<ApiResponse<{ id: string }>>(`/api/pg/${id}`, {
       method: 'DELETE',
     });
-    // Clear PG cache after deletion
     this.clearPGCache();
     return response;
   }
@@ -492,7 +592,6 @@ export class ApiService {
     const response = await this.request<ApiResponse<{ deletedId: string }>>(`/api/auth/users/${id}`, {
       method: 'DELETE',
     });
-    // Clear user cache after deletion
     this.cache.clearPattern(/\/api\/auth\/users/);
     return response;
   }
@@ -502,9 +601,57 @@ export class ApiService {
       method: 'PUT',
       body: JSON.stringify({ status }),
     });
-    // Clear user cache after update
     this.cache.clearPattern(/\/api\/auth\/users/);
     return response;
+  }
+
+  // ────────────────── Notification Endpoints ──────────────────
+
+  /**
+   * Send wishlist reminder email to current user
+   * POST /api/notifications/wishlist-reminder
+   */
+  async sendWishlistReminder(): Promise<ApiResponse<{ message: string }>> {
+    return this.request('/api/notifications/wishlist-reminder', {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * Send booking confirmation email
+   * POST /api/notifications/booking-confirmation
+   */
+  async sendBookingConfirmation(bookingDetails: {
+    pgName: string;
+    duration: number;
+    totalAmount: number;
+    moveInDate: string;
+  }): Promise<ApiResponse<{ message: string }>> {
+    return this.request('/api/notifications/booking-confirmation', {
+      method: 'POST',
+      body: JSON.stringify(bookingDetails),
+    });
+  }
+
+  /**
+   * Test email (for debugging)
+   * POST /api/notifications/test
+   */
+  async testNotification(): Promise<ApiResponse<{ message: string }>> {
+    return this.request('/api/notifications/test', {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * Send offer email to any user (Admin can send to any user)
+   * POST /api/notifications/send-offer
+   */
+  async sendOfferEmail(email: string, name: string): Promise<ApiResponse<{ message: string }>> {
+    return this.request('/api/notifications/send-offer', {
+      method: 'POST',
+      body: JSON.stringify({ email, name }),
+    });
   }
 
   // ────────────────── Utility ──────────────────

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -27,18 +28,15 @@ import {
   Building2,
   Download,
   Filter,
-  BarChart3,
   Activity,
-  Truck,
   Star,
   MoreVertical,
   Key,
   Edit,
   Save,
-  XCircle as CancelIcon,
-  Plus,
-  Trash,
-  AlertCircle,
+  Bell,
+  Send,
+  Mail as MailIcon
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { api, User } from '@/services/api';
@@ -534,7 +532,7 @@ const UserDetailDrawer = ({ user, onClose, onEdit }: { user: UserWithLocation | 
             {[
               { id: 'overview', label: 'Overview', icon: <UserCircle className="h-4 w-4" /> },
               { id: 'activity', label: 'Activity', icon: <Activity className="h-4 w-4" /> },
-              { id: 'bookings', label: 'Bookings', icon: <Truck className="h-4 w-4" /> },
+              { id: 'bookings', label: 'Bookings', icon: <Calendar className="h-4 w-4" /> },
               { id: 'reviews', label: 'Reviews', icon: <Star className="h-4 w-4" /> },
             ].map((tab) => (
               <button
@@ -724,7 +722,7 @@ const UserDetailDrawer = ({ user, onClose, onEdit }: { user: UserWithLocation | 
 
           {activeTab === 'bookings' && (
             <div className="text-center py-12">
-              <Truck className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+              <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-3" />
               <p className="text-gray-500">No booking history available</p>
             </div>
           )}
@@ -758,6 +756,8 @@ const AdminPanel = () => {
   const [statusChangeTarget, setStatusChangeTarget] = useState<{ user: UserWithLocation; newStatus: string } | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sendingEmail, setSendingEmail] = useState<string | null>(null);
+  const [sendingReminder, setSendingReminder] = useState<string | null>(null);
 
   // Check admin access
   useEffect(() => {
@@ -773,7 +773,6 @@ const AdminPanel = () => {
       setError(null);
       const response = await api.getAllUsers();
       if (response.success && response.data) {
-        // Add location data from API response or use default
         const usersWithLocation = (response.data.items || []).map((u: any) => ({
           ...u,
           location: u.location || {
@@ -805,6 +804,73 @@ const AdminPanel = () => {
       fetchUsers();
     }
   }, [isAuthenticated, user, fetchUsers]);
+
+  // ✅ Send Offer Email to user (instead of test email)
+  const sendOfferToUser = async (userEmail: string, userName: string) => {
+    try {
+      setSendingEmail(userEmail);
+      const response = await api.sendOfferEmail(userEmail, userName);
+      
+      if (response.success) {
+        toast.success(`🎉 Offer email sent to ${userEmail}`, {
+          description: 'User will receive 20% discount offer'
+        });
+      } else {
+        throw new Error(response.message || 'Failed to send offer');
+      }
+    } catch (error: any) {
+      toast.error('Failed to send offer email', {
+        description: error.message || 'Please try again'
+      });
+    } finally {
+      setSendingEmail(null);
+    }
+  };
+
+  // Send wishlist reminder to user
+  const sendWishlistReminder = async (userId: string, userName: string, userEmail: string) => {
+    try {
+      setSendingReminder(userId);
+      const response = await api.sendWishlistReminder();
+      if (response.success) {
+        toast.success(`Wishlist reminder sent to ${userName}`, {
+          description: `Email sent to ${userEmail}`
+        });
+      } else {
+        throw new Error(response.message || 'Failed to send reminder');
+      }
+    } catch (error: any) {
+      toast.error('Failed to send wishlist reminder', {
+        description: error.message || 'User may not have wishlist items'
+      });
+    } finally {
+      setSendingReminder(null);
+    }
+  };
+
+  // Send bulk offer emails to all active users
+  const sendBulkOfferEmails = async () => {
+    const activeUsers = users.filter(u => (u.status || 'active') === 'active');
+    const confirmed = window.confirm(`Send offer emails to ${activeUsers.length} active users?`);
+    if (!confirmed) return;
+    
+    toast.info(`Sending offer emails to ${activeUsers.length} users...`);
+    
+    let successCount = 0;
+    let failCount = 0;
+    
+    for (const user of activeUsers) {
+      try {
+        await api.sendOfferEmail(user.email, user.name);
+        successCount++;
+      } catch (error) {
+        failCount++;
+      }
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    toast.success(`Bulk offer completed! Sent to ${successCount} users, failed: ${failCount}`);
+  };
 
   // Filter users
   const filteredUsers = users.filter((u) => {
@@ -973,7 +1039,6 @@ const AdminPanel = () => {
             </div>
 
             <div className="flex items-center gap-4">
-              {/* Admin Profile */}
               <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 rounded-full border border-purple-100">
                 <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-xs font-bold">
                   {user?.name?.charAt(0)?.toUpperCase()}
@@ -981,7 +1046,6 @@ const AdminPanel = () => {
                 <span className="text-sm font-medium text-purple-700 hidden sm:inline">{user?.name}</span>
               </div>
 
-              {/* Navigation */}
               <button
                 onClick={() => navigate('/')}
                 className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
@@ -1003,10 +1067,10 @@ const AdminPanel = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* ── Error Alert ── */}
+        {/* Error Alert */}
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <AlertTriangle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-sm text-red-700">{error}</p>
               <button
@@ -1022,37 +1086,73 @@ const AdminPanel = () => {
           </div>
         )}
 
-        {/* ── Stats Cards ── */}
+        {/* Stats Cards - 5 cards (removed email status) */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-          {[
-            { label: 'Total Users', value: stats.total, icon: <Users className="h-5 w-5" />, color: 'from-sky-500 to-blue-600', bg: 'bg-sky-50' },
-            { label: 'Active', value: stats.active, icon: <CheckCircle2 className="h-5 w-5" />, color: 'from-emerald-500 to-green-600', bg: 'bg-emerald-50' },
-            { label: 'Suspended', value: stats.suspended, icon: <ShieldAlert className="h-5 w-5" />, color: 'from-red-500 to-rose-600', bg: 'bg-red-50' },
-            { label: 'Admins', value: stats.admins, icon: <Shield className="h-5 w-5" />, color: 'from-purple-500 to-indigo-600', bg: 'bg-purple-50' },
-            { label: 'Owners', value: stats.owners, icon: <Building2 className="h-5 w-5" />, color: 'from-blue-500 to-cyan-600', bg: 'bg-blue-50' },
-          ].map((stat, i) => (
-            <div key={i} className="relative overflow-hidden bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-all hover:scale-[1.02]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500 font-medium">{stat.label}</p>
-                  <p className="text-3xl font-bold text-gray-900 mt-1">{stat.value}</p>
-                </div>
-                <div className={`w-12 h-12 rounded-xl ${stat.bg} flex items-center justify-center`}>
-                  <div className={`bg-gradient-to-br ${stat.color} bg-clip-text text-transparent`}>
-                    {stat.icon}
-                  </div>
-                </div>
+          <div className="relative overflow-hidden bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-all hover:scale-[1.02]">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 font-medium">Total Users</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">{stats.total}</p>
               </div>
-              <div className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${stat.color}`} />
+              <div className="w-12 h-12 rounded-xl bg-sky-50 flex items-center justify-center">
+                <Users className="h-5 w-5 text-sky-600" />
+              </div>
             </div>
-          ))}
+          </div>
+
+          <div className="relative overflow-hidden bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-all hover:scale-[1.02]">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 font-medium">Active</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">{stats.active}</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center">
+                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="relative overflow-hidden bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-all hover:scale-[1.02]">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 font-medium">Suspended</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">{stats.suspended}</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center">
+                <ShieldAlert className="h-5 w-5 text-red-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="relative overflow-hidden bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-all hover:scale-[1.02]">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 font-medium">Admins</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">{stats.admins}</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center">
+                <Shield className="h-5 w-5 text-purple-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="relative overflow-hidden bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-all hover:scale-[1.02]">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 font-medium">Owners</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">{stats.owners}</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
+                <Building2 className="h-5 w-5 text-blue-600" />
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* ── Filters & Search ── */}
+        {/* Filters & Search */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm mb-6">
           <div className="p-5">
             <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4">
-              {/* Search */}
               <div className="relative flex-1">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
@@ -1064,7 +1164,6 @@ const AdminPanel = () => {
                 />
               </div>
 
-              {/* Quick Filters */}
               <button
                 onClick={() => setShowFilters(!showFilters)}
                 className="flex items-center gap-2 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
@@ -1074,7 +1173,6 @@ const AdminPanel = () => {
                 <ChevronDown className={`h-4 w-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
               </button>
 
-              {/* Export */}
               <button
                 onClick={handleExportData}
                 className="flex items-center gap-2 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
@@ -1083,7 +1181,14 @@ const AdminPanel = () => {
                 Export
               </button>
 
-              {/* Refresh */}
+              <button
+                onClick={sendBulkOfferEmails}
+                className="flex items-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition-colors shadow-sm shadow-green-200"
+              >
+                <Send className="h-4 w-4" />
+                Bulk Offer
+              </button>
+
               <button
                 onClick={fetchUsers}
                 disabled={loading}
@@ -1130,10 +1235,10 @@ const AdminPanel = () => {
                   <label className="block text-xs font-medium text-gray-500 mb-1.5">Location</label>
                   <select className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none">
                     <option>All Locations</option>
-                    <option>Mumbai</option>
-                    <option>Delhi</option>
-                    <option>Bangalore</option>
-                    <option>Chennai</option>
+                    <option>Chandigarh</option>
+                    <option>Mohali</option>
+                    <option>Panchkula</option>
+                    <option>Ropar</option>
                   </select>
                 </div>
               </div>
@@ -1141,7 +1246,7 @@ const AdminPanel = () => {
           </div>
         </div>
 
-        {/* ── Users Table ── */}
+        {/* Users Table */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-20">
@@ -1161,7 +1266,7 @@ const AdminPanel = () => {
           ) : (
             <>
               {/* Table Header */}
-              <div className="hidden lg:grid lg:grid-cols-[2fr_2fr_1fr_1fr_1.5fr_0.5fr] gap-4 px-6 py-4 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <div className="hidden lg:grid lg:grid-cols-[2fr_2fr_1fr_1fr_1.5fr_0.8fr] gap-4 px-6 py-4 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 <span>User</span>
                 <span>Contact</span>
                 <span>Role</span>
@@ -1174,7 +1279,7 @@ const AdminPanel = () => {
               {filteredUsers.map((u) => (
                 <div
                   key={u._id}
-                  className="grid grid-cols-1 lg:grid-cols-[2fr_2fr_1fr_1fr_1.5fr_0.5fr] gap-4 items-center px-6 py-4 border-b border-gray-50 hover:bg-gray-50/50 transition-colors"
+                  className="grid grid-cols-1 lg:grid-cols-[2fr_2fr_1fr_1fr_1.5fr_0.8fr] gap-4 items-center px-6 py-4 border-b border-gray-50 hover:bg-gray-50/50 transition-colors"
                 >
                   {/* User Info */}
                   <div className="flex items-center gap-3">
@@ -1241,38 +1346,64 @@ const AdminPanel = () => {
                       <Edit className="h-4 w-4" />
                     </button>
 
-                    {u.role !== 'admin' && (
-                      <>
-                        <button
-                          onClick={() =>
-                            setStatusChangeTarget({
-                              user: u,
-                              newStatus: (u.status || 'active') === 'active' ? 'suspended' : 'active',
-                            })
-                          }
-                          className={`p-2 rounded-lg transition-colors ${
-                            (u.status || 'active') === 'active'
-                              ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'
-                              : 'text-amber-500 hover:text-emerald-600 hover:bg-emerald-50'
-                          }`}
-                          title={(u.status || 'active') === 'active' ? 'Suspend User' : 'Activate User'}
-                        >
-                          {(u.status || 'active') === 'active' ? <ShieldOff className="h-4 w-4" /> : <Shield className="h-4 w-4" />}
-                        </button>
+                    {/* Send Offer Email */}
+                    <button
+                      onClick={() => sendOfferToUser(u.email, u.name)}
+                      disabled={sendingEmail === u.email}
+                      className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50"
+                      title="Send Offer Email"
+                    >
+                      {sendingEmail === u.email ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <MailIcon className="h-4 w-4" />
+                      )}
+                    </button>
 
-                        <button
-                          onClick={() => setDeleteTarget(u)}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Delete User"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </>
+                    {/* Send Wishlist Reminder */}
+                    <button
+                      onClick={() => sendWishlistReminder(u._id, u.name, u.email)}
+                      disabled={sendingReminder === u._id}
+                      className="p-2 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors disabled:opacity-50"
+                      title="Send Wishlist Reminder"
+                    >
+                      {sendingReminder === u._id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Bell className="h-4 w-4" />
+                      )}
+                    </button>
+
+                    {/* Status Toggle */}
+                    {u.role !== 'admin' && (
+                      <button
+                        onClick={() =>
+                          setStatusChangeTarget({
+                            user: u,
+                            newStatus: (u.status || 'active') === 'active' ? 'suspended' : 'active',
+                          })
+                        }
+                        className={`p-2 rounded-lg transition-colors ${
+                          (u.status || 'active') === 'active'
+                            ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'
+                            : 'text-amber-500 hover:text-emerald-600 hover:bg-emerald-50'
+                        }`}
+                        title={(u.status || 'active') === 'active' ? 'Suspend User' : 'Activate User'}
+                      >
+                        {(u.status || 'active') === 'active' ? <ShieldOff className="h-4 w-4" /> : <Shield className="h-4 w-4" />}
+                      </button>
                     )}
 
-                    <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors lg:hidden">
-                      <MoreVertical className="h-4 w-4" />
-                    </button>
+                    {/* Delete User */}
+                    {u.role !== 'admin' && (
+                      <button
+                        onClick={() => setDeleteTarget(u)}
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete User"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
 
                   {/* Mobile Location Badge */}
@@ -1288,30 +1419,13 @@ const AdminPanel = () => {
                   Showing <span className="font-semibold text-gray-700">{filteredUsers.length}</span> of{' '}
                   <span className="font-semibold text-gray-700">{users.length}</span> users
                 </p>
-                <div className="flex items-center gap-2">
-                  <button className="px-3 py-1 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                    Previous
-                  </button>
-                  <button className="px-3 py-1 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
-                    1
-                  </button>
-                  <button className="px-3 py-1 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                    2
-                  </button>
-                  <button className="px-3 py-1 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                    3
-                  </button>
-                  <button className="px-3 py-1 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                    Next
-                  </button>
-                </div>
               </div>
             </>
           )}
         </div>
       </main>
 
-      {/* ── Modals ── */}
+      {/* Modals */}
       <ConfirmModal
         isOpen={!!deleteTarget}
         title="Delete User Account"
