@@ -56,6 +56,8 @@ export interface PGListing {
   ownerId?: string;
   contactPhone?: string;
   contactEmail?: string;
+  videoUrl?: string;
+  virtualTour?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -542,6 +544,10 @@ export class ApiService {
     return this.request<ApiResponse<PGListing>>(`/api/pg/${id}`);
   }
 
+  async getPGBySlug(slug: string): Promise<ApiResponse<PGListing>> {
+    return this.request<ApiResponse<PGListing>>(`/api/pg/slug/${slug}`);
+  }
+
   async getMyListings(): Promise<ApiResponse<{ items: PGListing[]; total: number }>> {
     return this.request<ApiResponse<{ items: PGListing[]; total: number }>>('/api/pg/my-listings');
   }
@@ -576,6 +582,48 @@ export class ApiService {
 
   async getStats(): Promise<ApiResponse<any>> {
     return this.request<ApiResponse<any>>('/api/pg/admin/stats');
+  }
+
+  // ────────────────── Price Alert Endpoints ──────────────────
+
+  /**
+   * Get all price alerts for current user
+   * GET /api/price-alerts
+   */
+  async getPriceAlerts(): Promise<ApiResponse<any[]>> {
+    return this.request('/api/price-alerts', { method: 'GET' });
+  }
+
+  /**
+   * Create a new price alert
+   * POST /api/price-alerts
+   */
+  async createPriceAlert(pgId: string, desiredPrice: number): Promise<ApiResponse<any>> {
+    return this.request('/api/price-alerts', {
+      method: 'POST',
+      body: JSON.stringify({ pgId, desiredPrice })
+    });
+  }
+
+  /**
+   * Update a price alert
+   * PUT /api/price-alerts/:id
+   */
+  async updatePriceAlert(alertId: string, desiredPrice: number): Promise<ApiResponse<any>> {
+    return this.request(`/api/price-alerts/${alertId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ desiredPrice })
+    });
+  }
+
+  /**
+   * Delete a price alert
+   * DELETE /api/price-alerts/:id
+   */
+  async deletePriceAlert(alertId: string): Promise<ApiResponse<any>> {
+    return this.request(`/api/price-alerts/${alertId}`, {
+      method: 'DELETE'
+    });
   }
 
   // ────────────────── Admin Endpoints ──────────────────
@@ -652,6 +700,56 @@ export class ApiService {
       method: 'POST',
       body: JSON.stringify({ email, name }),
     });
+  }
+
+  // ────────────────── PG Demand & Views Endpoints ──────────────────
+
+  /**
+   * Get demand meter data for a PG
+   * GET /api/pg/:id/demand-meter
+   */
+  async getDemandMeter(pgId: string): Promise<ApiResponse<any>> {
+    return this.request(`/api/pg/${pgId}/demand-meter`, { method: 'GET' });
+  }
+
+  /**
+   * Increment view count for a PG
+   * POST /api/pg/:id/increment-view
+   */
+  async incrementViewCount(pgId: string): Promise<ApiResponse<any>> {
+    return this.request(`/api/pg/${pgId}/increment-view`, { method: 'POST' });
+  }
+
+  // ────────────────── Blog Endpoints ──────────────────
+
+  /**
+   * Get all blogs
+   * GET /api/blogs
+   */
+  async getBlogs(params?: { page?: number; limit?: number; category?: string; tag?: string }): Promise<ApiResponse<any>> {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.category) queryParams.append('category', params.category);
+    if (params?.tag) queryParams.append('tag', params.tag);
+    
+    return this.request(`/api/blogs${queryParams.toString() ? `?${queryParams}` : ''}`, { method: 'GET' });
+  }
+
+  /**
+   * Get blog by slug
+   * GET /api/blogs/:slug
+   */
+  async getBlogBySlug(slug: string): Promise<ApiResponse<any>> {
+    return this.request(`/api/blogs/${slug}`, { method: 'GET' });
+  }
+
+  /**
+   * Get featured blogs
+   * GET /api/blogs/featured
+   */
+  async getFeaturedBlogs(limit: number = 3): Promise<ApiResponse<any[]>> {
+    return this.request(`/api/blogs/featured?limit=${limit}`, { method: 'GET' });
   }
 
   // ────────────────── Utility ──────────────────

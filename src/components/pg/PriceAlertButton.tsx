@@ -15,43 +15,28 @@ export const PriceAlertButton = ({ pgId, currentPrice, pgName }: PriceAlertButto
   const [desiredPrice, setDesiredPrice] = useState(Math.round(currentPrice * 0.8));
   const [hasAlert, setHasAlert] = useState(false);
   const [checking, setChecking] = useState(true);
-  
-  // Check if running on production
-  const isProduction = import.meta.env.PROD || window.location.hostname !== 'localhost';
-  
-  // Get API URL
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // Check if user already has alert
+  // Check if user is logged in
+  useEffect(() => {
+    const token = localStorage.getItem('auth_token');
+    setIsLoggedIn(!!token);
+  }, []);
+
+  // Check if user already has alert for this PG
   useEffect(() => {
     const checkExistingAlert = async () => {
-      // On production, price alerts are disabled for now
-      if (isProduction) {
+      if (!isLoggedIn) {
         setChecking(false);
         return;
       }
       
       try {
-        // Get auth token if exists
-        const token = localStorage.getItem('token');
-        if (!token) {
-          setChecking(false);
-          return;
-        }
-        
-        const response = await fetch(`${API_URL}/price-alerts`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.data) {
-            const existing = data.data.find((alert: any) => alert.pg?._id === pgId);
-            if (existing) {
-              setHasAlert(true);
-            }
+        const response = await api.getPriceAlerts();
+        if (response.success && response.data) {
+          const existing = response.data.find((alert: any) => alert.pg?._id === pgId);
+          if (existing) {
+            setHasAlert(true);
           }
         }
       } catch (error) {
@@ -62,7 +47,7 @@ export const PriceAlertButton = ({ pgId, currentPrice, pgName }: PriceAlertButto
     };
     
     checkExistingAlert();
-  }, [pgId, isProduction, API_URL]);
+  }, [pgId, isLoggedIn]);
 
   const createAlert = async () => {
     if (desiredPrice >= currentPrice) {
@@ -72,10 +57,9 @@ export const PriceAlertButton = ({ pgId, currentPrice, pgName }: PriceAlertButto
       return;
     }
 
-    // On production, show "Coming Soon" message
-    if (isProduction) {
-      toast.info('Coming Soon!', {
-        description: 'Price alerts feature will be available on production soon. 🚀'
+    if (!isLoggedIn) {
+      toast.error('Login Required', {
+        description: 'Please login to create price alerts'
       });
       setShowModal(false);
       return;
@@ -83,34 +67,16 @@ export const PriceAlertButton = ({ pgId, currentPrice, pgName }: PriceAlertButto
 
     try {
       setLoading(true);
+      const response = await api.createPriceAlert(pgId, desiredPrice);
       
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast.error('Please login first', {
-          description: 'You need to be logged in to create price alerts'
-        });
-        return;
-      }
-      
-      const response = await fetch(`${API_URL}/price-alerts`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ pgId, desiredPrice })
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok && data.success) {
+      if (response.success) {
         toast.success('Price alert created!', {
           description: `We'll notify you when price drops below ₹${desiredPrice.toLocaleString()}`
         });
         setHasAlert(true);
         setShowModal(false);
       } else {
-        throw new Error(data.message || 'Failed to create alert');
+        throw new Error(response.message || 'Failed to create alert');
       }
     } catch (error: any) {
       toast.error('Failed to create alert', { 
@@ -121,20 +87,8 @@ export const PriceAlertButton = ({ pgId, currentPrice, pgName }: PriceAlertButto
     }
   };
 
-  // Don't show on production if feature is disabled
-  if (isProduction && !hasAlert) {
-    return (
-      <button
-        onClick={() => setShowModal(true)}
-        className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition w-full justify-center"
-      >
-        <Bell className="h-4 w-4" />
-        Price Alert (Soon)
-      </button>
-    );
-  }
-
-  if (checking && !isProduction) {
+  // Loading state
+  if (checking) {
     return (
       <button className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 rounded-lg opacity-50 w-full justify-center">
         <Loader2 className="h-4 w-4 animate-spin" />
@@ -143,6 +97,7 @@ export const PriceAlertButton = ({ pgId, currentPrice, pgName }: PriceAlertButto
     );
   }
 
+  // Alert already exists
   if (hasAlert) {
     return (
       <button 
@@ -201,12 +156,12 @@ export const PriceAlertButton = ({ pgId, currentPrice, pgName }: PriceAlertButto
               />
             </div>
             
-            {isProduction && (
+            {!isLoggedIn && (
               <div className="bg-yellow-50 p-3 rounded-lg mb-4">
                 <div className="flex items-start gap-2">
                   <AlertCircle className="h-4 w-4 text-yellow-600 mt-0.5" />
                   <p className="text-xs text-yellow-700">
-                    🚀 This feature is coming soon to production! We'll notify you via email when prices drop.
+                    Please login to create price alerts. <a href="/login" className="underline font-medium">Login here</a>
                   </p>
                 </div>
               </div>
@@ -216,7 +171,7 @@ export const PriceAlertButton = ({ pgId, currentPrice, pgName }: PriceAlertButto
               <div className="flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5" />
                 <p className="text-xs text-blue-700">
-                  We'll send a one-time email notification when the price drops. You can create multiple alerts for different PGs.
+                  We'll send you an email notification when the price drops. You can create multiple alerts for different PGs.
                 </p>
               </div>
             </div>
@@ -224,11 +179,11 @@ export const PriceAlertButton = ({ pgId, currentPrice, pgName }: PriceAlertButto
             <div className="flex gap-2">
               <button
                 onClick={createAlert}
-                disabled={loading || desiredPrice >= currentPrice}
+                disabled={loading || desiredPrice >= currentPrice || !isLoggedIn}
                 className="flex-1 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-                {isProduction ? 'Notify Me When Ready' : 'Create Alert'}
+                Create Alert
               </button>
               <button
                 onClick={() => setShowModal(false)}
