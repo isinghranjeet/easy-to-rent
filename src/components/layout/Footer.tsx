@@ -7,9 +7,6 @@ import {
   Twitter,
   Instagram,
   Youtube,
-  Shield,
-  Users,
-  Home,
   Clock,
   MessageSquare,
   ChevronRight,
@@ -19,8 +16,6 @@ import {
   X,
   Send,
   Bot,
-  Star,
-  AlertCircle,
   Copy,
   Paperclip,
   Smile,
@@ -35,7 +30,6 @@ import {
   Loader2
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
-import { api } from "@/services/api";
 
 interface Location {
   _id: string;
@@ -69,7 +63,7 @@ export function Footer() {
   const [attachments, setAttachments] = useState([]);
   const [isMobile, setIsMobile] = useState(false);
   
-  // ✅ NEW: State for popular locations
+  // State for popular locations
   const [popularLocations, setPopularLocations] = useState<Location[]>([]);
   const [loadingLocations, setLoadingLocations] = useState(true);
 
@@ -79,42 +73,45 @@ export function Footer() {
   const settingsRef = useRef(null);
   const chatRef = useRef(null);
 
-  // ✅ NEW: Fetch popular locations from API
+  // Fetch popular locations from API
   useEffect(() => {
     const fetchPopularLocations = async () => {
       try {
         setLoadingLocations(true);
-        const response = await api.getPopularLocations(8);
-        if (response.success && response.data) {
-          setPopularLocations(response.data);
-        } else {
-          // Fallback locations if API fails
-          setPopularLocations([
-            { _id: '1', name: 'University Area', slug: 'university-area', pgCount: 24 },
-            { _id: '2', name: 'City Center', slug: 'city-center', pgCount: 18 },
-            { _id: '3', name: 'Library Road', slug: 'library-road', pgCount: 12 },
-            { _id: '4', name: 'Sports Complex', slug: 'sports-complex', pgCount: 15 },
-            { _id: '5', name: 'Girls PG', slug: 'girls-pg', pgCount: 20 },
-            { _id: '6', name: 'Boys PG', slug: 'boys-pg', pgCount: 22 },
-            { _id: '7', name: 'Family Flats', slug: 'family-flats', pgCount: 10 },
-          ]);
+        
+        // Try to fetch from API first
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://eassy-to-rent-backend.onrender.com/api';
+        const response = await fetch(`${API_BASE_URL}/locations/popular?limit=8`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.data && data.data.length > 0) {
+            setPopularLocations(data.data);
+            return;
+          }
         }
+        
+        // Fallback to real database data (from your MongoDB)
+        setPopularLocations([
+          { _id: '1', name: 'Chandigarh', slug: 'chandigarh', pgCount: 7 },
+          { _id: '2', name: 'kharar', slug: 'kharar', pgCount: 2 },
+          { _id: '3', name: 'chandigarh university gate no 3', slug: 'chandigarh-university-gate-3', pgCount: 1 },
+          { _id: '4', name: 'Ropar', slug: 'ropar', pgCount: 1 },
+        ]);
       } catch (error) {
         console.error('Error fetching locations:', error);
-        // Fallback static locations
+        // Use real database data as fallback
         setPopularLocations([
-          { _id: '1', name: 'University Area', slug: 'university-area', pgCount: 24 },
-          { _id: '2', name: 'City Center', slug: 'city-center', pgCount: 18 },
-          { _id: '3', name: 'Library Road', slug: 'library-road', pgCount: 12 },
-          { _id: '4', name: 'Sports Complex', slug: 'sports-complex', pgCount: 15 },
-          { _id: '5', name: 'Girls PG', slug: 'girls-pg', pgCount: 20 },
-          { _id: '6', name: 'Boys PG', slug: 'boys-pg', pgCount: 22 },
-          { _id: '7', name: 'Family Flats', slug: 'family-flats', pgCount: 10 },
+          { _id: '1', name: 'Chandigarh', slug: 'chandigarh', pgCount: 7 },
+          { _id: '2', name: 'kharar', slug: 'kharar', pgCount: 2 },
+          { _id: '3', name: 'chandigarh university gate no 3', slug: 'chandigarh-university-gate-3', pgCount: 1 },
+          { _id: '4', name: 'Ropar', slug: 'ropar', pgCount: 1 },
         ]);
       } finally {
         setLoadingLocations(false);
       }
     };
+    
     fetchPopularLocations();
   }, []);
 
@@ -128,7 +125,7 @@ export function Footer() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Knowledge base for responses (keeping your existing knowledgeBase object)
+  // Knowledge base for responses
   const knowledgeBase = {
     properties: {
       available: "We currently have 156 verified properties available across 8 locations:\n\n• University Area: 42 properties\n• City Center: 38 properties\n• Library Road: 25 properties\n• Sports Complex: 18 properties\n• Girls PG Zone: 15 properties\n• Boys PG Zone: 12 properties\n\nPlease specify your preferences for a refined list.",
@@ -364,10 +361,7 @@ export function Footer() {
   };
 
   const emojis = ["😊", "😂", "❤️", "👍", "🎉", "🤔", "😢", "🔥", "✨", "🏠", "💰", "📍", "📞", "✅"];
-
-  const propertyTypes = [
-    "Single Room", "Sharing Room", "Full Flat", "Girls PG", "Boys PG"
-  ];
+  const propertyTypes = ["Single Room", "Sharing Room", "Full Flat", "Girls PG", "Boys PG"];
 
   return (
     <>
@@ -376,13 +370,11 @@ export function Footer() {
         .footer-gradient {
           background: linear-gradient(135deg, #0b1120 0%, #0a0f1a 100%);
         }
-
         .footer-link {
           position: relative;
           display: inline-block;
           transition: all 0.3s ease;
         }
-
         .footer-link::after {
           content: "";
           position: absolute;
@@ -393,24 +385,19 @@ export function Footer() {
           background: #f97316;
           transition: width 0.3s ease;
         }
-
         .footer-link:hover::after {
           width: 100%;
         }
-
         .footer-social {
           transition: all 0.3s ease;
         }
-
         .footer-social:hover {
           transform: translateY(-4px);
         }
-
         .footer-title {
           position: relative;
           padding-bottom: 8px;
         }
-
         .footer-title::after {
           content: "";
           position: absolute;
@@ -421,27 +408,21 @@ export function Footer() {
           background: #f97316;
           border-radius: 999px;
         }
-
         .footer-bottom {
           background: rgba(255,255,255,0.02);
         }
-
         .trust-badge {
           background: rgba(249, 115, 22, 0.1);
           border: 1px solid rgba(249, 115, 22, 0.2);
         }
-        
         .newsletter-input {
           background: rgba(255, 255, 255, 0.05);
           transition: all 0.3s ease;
         }
-        
         .newsletter-input:focus {
           background: rgba(255, 255, 255, 0.08);
           border-color: #f97316;
         }
-        
-        /* Chat Window - Responsive */
         .chat-window {
           position: fixed;
           bottom: 90px;
@@ -455,7 +436,6 @@ export function Footer() {
           border: 1px solid #e2e8f0;
           transition: all 0.3s ease;
         }
-        
         @media (max-width: 768px) {
           .chat-window {
             width: 90vw;
@@ -465,7 +445,6 @@ export function Footer() {
             max-height: 80vh;
           }
         }
-        
         @media (max-width: 480px) {
           .chat-window {
             width: 96vw;
@@ -474,28 +453,23 @@ export function Footer() {
             bottom: 70px;
             max-height: 85vh;
           }
-          
           .live-support-btn {
             padding: 12px 20px !important;
             font-size: 14px !important;
           }
-          
           .live-support-btn span {
             display: inline-block !important;
           }
         }
-        
         .chat-window.minimized {
           height: 70px;
           overflow: hidden;
         }
-        
         @media (max-width: 768px) {
           .chat-window.minimized {
             height: 60px;
           }
         }
-        
         .chat-header {
           background: #1a1f2e;
           color: white;
@@ -503,32 +477,26 @@ export function Footer() {
           cursor: pointer;
           border-bottom: 2px solid #f97316;
         }
-        
         @media (max-width: 768px) {
           .chat-header {
             padding: 12px 16px;
           }
         }
-        
         .chat-body {
           padding: 20px;
           max-height: 450px;
           overflow-y: auto;
           background: #f8fafc;
         }
-        
         @media (max-width: 768px) {
           .chat-body {
             padding: 16px;
             max-height: calc(80vh - 120px);
           }
         }
-        
-        /* Message bubbles */
         .message-wrapper {
           margin-bottom: 16px;
         }
-        
         .message-bubble {
           max-width: 85%;
           padding: 12px 16px;
@@ -537,7 +505,6 @@ export function Footer() {
           line-height: 1.5;
           position: relative;
         }
-        
         @media (max-width: 768px) {
           .message-bubble {
             max-width: 90%;
@@ -545,19 +512,16 @@ export function Footer() {
             font-size: 14px;
           }
         }
-        
         .agent-message {
           background: #ffffff;
           color: #1e293b;
           border-left: 4px solid #f97316;
         }
-        
         .user-message {
           background: #f97316;
           color: white;
           margin-left: auto;
         }
-        
         .system-message {
           background: #f1f5f9;
           color: #64748b;
@@ -566,14 +530,12 @@ export function Footer() {
           text-align: center;
           max-width: 100%;
         }
-        
         .agent-name {
           font-size: 12px;
           font-weight: 600;
           color: #f97316;
           margin-bottom: 4px;
         }
-        
         .agent-status {
           display: inline-block;
           width: 8px;
@@ -582,18 +544,15 @@ export function Footer() {
           background: #10b981;
           margin-left: 6px;
         }
-        
         .message-time {
           font-size: 10px;
           color: #94a3b8;
           margin-top: 6px;
           text-align: right;
         }
-        
         .user-message .message-time {
           color: #fef9c3;
         }
-        
         .message-actions {
           position: absolute;
           top: -8px;
@@ -607,18 +566,15 @@ export function Footer() {
           border-radius: 20px;
           box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
-        
         @media (max-width: 768px) {
           .message-actions {
             opacity: 0.8;
             top: -6px;
           }
         }
-        
         .message-bubble:hover .message-actions {
           opacity: 1;
         }
-        
         .message-action-btn {
           width: 24px;
           height: 24px;
@@ -632,20 +588,16 @@ export function Footer() {
           justify-content: center;
           transition: all 0.2s ease;
         }
-        
         .message-action-btn:hover {
           background: #f97316;
           color: white;
         }
-        
-        /* Property chips */
         .property-chips {
           display: flex;
           flex-wrap: wrap;
           gap: 8px;
           margin: 16px 0;
         }
-        
         .property-chip {
           background: white;
           border: 1px solid #e2e8f0;
@@ -656,26 +608,21 @@ export function Footer() {
           cursor: pointer;
           transition: all 0.2s ease;
         }
-        
         @media (max-width: 768px) {
           .property-chip {
             padding: 6px 12px;
             font-size: 12px;
           }
         }
-        
         .property-chip:hover {
           background: #f97316;
           border-color: #f97316;
           color: white;
         }
-        
-        /* Search bar */
         .search-bar {
           margin-bottom: 16px;
           position: relative;
         }
-        
         .search-input {
           width: 100%;
           padding: 10px 16px 10px 40px;
@@ -685,19 +632,16 @@ export function Footer() {
           background: white;
           color: #1e293b;
         }
-        
         @media (max-width: 768px) {
           .search-input {
             padding: 8px 14px 8px 36px;
             font-size: 13px;
           }
         }
-        
         .search-input:focus {
           outline: none;
           border-color: #f97316;
         }
-        
         .search-icon {
           position: absolute;
           left: 14px;
@@ -705,8 +649,6 @@ export function Footer() {
           transform: translateY(-50%);
           color: #94a3b8;
         }
-        
-        /* Typing indicator */
         .typing-indicator {
           display: flex;
           align-items: center;
@@ -717,7 +659,6 @@ export function Footer() {
           width: fit-content;
           border-left: 4px solid #f97316;
         }
-        
         .typing-dot {
           width: 8px;
           height: 8px;
@@ -725,29 +666,23 @@ export function Footer() {
           border-radius: 50%;
           animation: typingBounce 1.4s infinite;
         }
-        
         .typing-dot:nth-child(1) { animation-delay: -0.32s; }
         .typing-dot:nth-child(2) { animation-delay: -0.16s; }
-        
         @keyframes typingBounce {
           0%, 80%, 100% { transform: scale(0.6); opacity: 0.6; }
           40% { transform: scale(1); opacity: 1; }
         }
-        
-        /* Chat input */
         .chat-input-area {
           padding: 16px 20px;
           background: white;
           border-top: 1px solid #e2e8f0;
           position: relative;
         }
-        
         @media (max-width: 768px) {
           .chat-input-area {
             padding: 12px 16px;
           }
         }
-        
         .chat-input-container {
           background: #ffffff;
           border: 2px solid #e2e8f0;
@@ -757,7 +692,6 @@ export function Footer() {
           align-items: center;
           transition: border-color 0.2s ease;
         }
-        
         .chat-input {
           border: none;
           padding: 10px 0;
@@ -770,24 +704,20 @@ export function Footer() {
           max-height: 100px;
           font-family: inherit;
         }
-        
         @media (max-width: 768px) {
           .chat-input {
             padding: 8px 0;
             font-size: 14px;
           }
         }
-        
         .chat-input::placeholder {
           color: #94a3b8;
         }
-        
         .input-actions {
           display: flex;
           gap: 4px;
           align-items: center;
         }
-        
         .input-action-btn {
           width: 36px;
           height: 36px;
@@ -801,19 +731,16 @@ export function Footer() {
           justify-content: center;
           transition: all 0.2s ease;
         }
-        
         @media (max-width: 768px) {
           .input-action-btn {
             width: 32px;
             height: 32px;
           }
         }
-        
         .input-action-btn:hover {
           background: #f1f5f9;
           color: #f97316;
         }
-        
         .send-btn {
           background: #f97316;
           color: white;
@@ -829,28 +756,22 @@ export function Footer() {
           margin-left: 8px;
           transition: all 0.2s ease;
         }
-        
         @media (max-width: 768px) {
           .send-btn {
             padding: 8px 16px;
             font-size: 13px;
           }
-          
           .send-btn span {
             display: none;
           }
         }
-        
         .send-btn:hover:not(:disabled) {
           background: #ea580c;
         }
-        
         .send-btn:disabled {
           background: #cbd5e1;
           cursor: not-allowed;
         }
-        
-        /* Attachments preview */
         .attachments-preview {
           display: flex;
           gap: 8px;
@@ -860,7 +781,6 @@ export function Footer() {
           margin-bottom: 8px;
           flex-wrap: wrap;
         }
-        
         .attachment-badge {
           background: white;
           border: 1px solid #e2e8f0;
@@ -871,8 +791,6 @@ export function Footer() {
           align-items: center;
           gap: 4px;
         }
-        
-        /* Emoji picker */
         .emoji-picker {
           position: absolute;
           bottom: 80px;
@@ -887,7 +805,6 @@ export function Footer() {
           gap: 8px;
           z-index: 30;
         }
-        
         @media (max-width: 768px) {
           .emoji-picker {
             bottom: 70px;
@@ -896,7 +813,6 @@ export function Footer() {
             grid-template-columns: repeat(7, 1fr);
           }
         }
-        
         .emoji-item {
           width: 36px;
           height: 36px;
@@ -908,7 +824,6 @@ export function Footer() {
           border-radius: 8px;
           transition: all 0.2s ease;
         }
-        
         @media (max-width: 768px) {
           .emoji-item {
             width: 32px;
@@ -916,13 +831,10 @@ export function Footer() {
             font-size: 18px;
           }
         }
-        
         .emoji-item:hover {
           background: #fff7ed;
           transform: scale(1.1);
         }
-        
-        /* Status indicator */
         .status-indicator {
           display: inline-block;
           width: 10px;
@@ -931,14 +843,11 @@ export function Footer() {
           background: #10b981;
           animation: pulse 2s infinite;
         }
-        
         @keyframes pulse {
           0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
           70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
           100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
         }
-        
-        /* Unread badge */
         .unread-badge {
           position: absolute;
           top: -8px;
@@ -955,8 +864,6 @@ export function Footer() {
           font-weight: bold;
           border: 2px solid white;
         }
-        
-        /* Live support button */
         .live-support-btn {
           background: #f97316;
           border: none;
@@ -972,19 +879,15 @@ export function Footer() {
           transition: all 0.3s ease;
           cursor: pointer;
         }
-        
         .live-support-btn:hover {
           background: #ea580c;
           transform: translateY(-2px);
         }
-        
         @media (max-width: 480px) {
           .live-support-btn {
             padding: 10px 16px !important;
           }
         }
-        
-        /* Contact panel */
         .contact-panel {
           background: white;
           border-radius: 12px;
@@ -992,13 +895,11 @@ export function Footer() {
           margin-top: 16px;
           border: 1px solid #e2e8f0;
         }
-        
         @media (max-width: 768px) {
           .contact-panel {
             padding: 12px;
           }
         }
-        
         .contact-item {
           display: flex;
           align-items: center;
@@ -1008,21 +909,16 @@ export function Footer() {
           font-size: 13px;
           border-bottom: 1px solid #f1f5f9;
         }
-        
         .contact-item:last-child {
           border-bottom: none;
         }
-        
         .contact-item a {
           color: #334155;
           text-decoration: none;
         }
-        
         .contact-item a:hover {
           color: #f97316;
         }
-        
-        /* Settings menu */
         .settings-menu {
           position: absolute;
           top: 50px;
@@ -1035,7 +931,6 @@ export function Footer() {
           z-index: 40;
           min-width: 180px;
         }
-        
         @media (max-width: 768px) {
           .settings-menu {
             top: 45px;
@@ -1043,7 +938,6 @@ export function Footer() {
             min-width: 160px;
           }
         }
-        
         .settings-item {
           padding: 10px 16px;
           display: flex;
@@ -1055,19 +949,15 @@ export function Footer() {
           font-size: 13px;
           transition: all 0.2s ease;
         }
-        
         .settings-item:hover {
           background: #fff7ed;
           color: #f97316;
         }
-        
         .settings-divider {
           height: 1px;
           background: #e2e8f0;
           margin: 8px 0;
         }
-        
-        /* Chat header buttons */
         .header-btn {
           background: transparent;
           border: none;
@@ -1081,23 +971,18 @@ export function Footer() {
           cursor: pointer;
           transition: background 0.2s ease;
         }
-        
         @media (max-width: 768px) {
           .header-btn {
             width: 28px;
             height: 28px;
           }
         }
-        
         .header-btn:hover {
           background: rgba(255, 255, 255, 0.15);
         }
-        
         .header-btn.active {
           background: rgba(249, 115, 22, 0.3);
         }
-
-        /* Mobile touch optimizations */
         @media (max-width: 768px) {
           button, 
           .property-chip,
@@ -1109,11 +994,9 @@ export function Footer() {
             min-height: 44px;
             min-width: 44px;
           }
-          
           .property-chip {
             min-height: 36px;
           }
-          
           .input-action-btn,
           .header-btn {
             min-height: 40px;
@@ -1125,7 +1008,6 @@ export function Footer() {
 
       <footer className="footer-gradient mt-auto text-white">
         <div className="container mx-auto px-4 py-8 md:py-12">
-
           {/* Trust Badges */}
           <div className="mb-8 md:mb-10 rounded-xl trust-badge p-4 md:p-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
@@ -1154,7 +1036,6 @@ export function Footer() {
           </div>
 
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
-
             {/* Brand */}
             <div className="space-y-4">
               <div className="flex items-center gap-2">
@@ -1207,12 +1088,12 @@ export function Footer() {
               </ul>
             </div>
 
-            {/* ✅ DYNAMIC POPULAR LOCATIONS - Database se real data */}
+            {/* Popular Locations - Real Database Data */}
             <div>
               <h4 className="footer-title text-lg font-semibold text-orange-400">Popular Locations</h4>
               {loadingLocations ? (
                 <div className="mt-4 space-y-2">
-                  {[1, 2, 3, 4, 5, 6].map(i => (
+                  {[1, 2, 3, 4].map(i => (
                     <div key={i} className="flex items-center gap-2">
                       <Loader2 className="h-3 w-3 text-orange-400 animate-spin" />
                       <div className="h-4 w-24 bg-gray-700 rounded animate-pulse"></div>
