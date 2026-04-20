@@ -6,20 +6,24 @@ import {
   Check, ChevronLeft, ChevronRight, X, Calendar, Clock, Users,
   TrendingUp, Home, Crown,
   BadgeCheck, Users as UsersIcon, Building,
-  Bus, Train, Coffee, ShoppingBag, Hospital, School, Landmark
+  Bus, Train, Coffee, ShoppingBag, Hospital, School, Landmark,
+  Eye, ThumbsUp, MessageSquare, Award, Verified, Sparkles
 } from 'lucide-react';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { AirbnbMap } from '@/components/map/AirbnbMap';
 import { PriceAlertButton } from '@/components/pg/PriceAlertButton';
+import { CreditPurchaseModal } from '@/components/pg/CreditPurchaseModal';
 import { api } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Slider } from '@/components/ui/slider';
 import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 const amenityIcons: Record<string, React.ElementType> = {
   'WiFi': Wifi,
@@ -55,6 +59,16 @@ interface NearbyPlace {
   duration?: string;
 }
 
+interface Review {
+  _id: string;
+  userId: string;
+  userName: string;
+  rating: number;
+  comment: string;
+  verifiedBooking: boolean;
+  createdAt: string;
+}
+
 interface PGListing {
   _id: string;
   name: string;
@@ -81,28 +95,28 @@ interface PGListing {
   location?: Location;
   nearbyPlaces?: NearbyPlace[];
   coordinates?: { lat: number; lng: number };
-}
-
-interface DemandMeterData {
-  views: number;
-  weeklyBookings: number;
-  monthlyBookings: number;
-  rating: number;
-  reviewCount: number;
-  demandLevel: string;
-  demandColor: string;
-  demandPercentage: number;
-  demandMessage: string;
+  videoUrl?: string;
+  virtualTour?: string;
 }
 
 const PGDetail = () => {
   const { slug } = useParams<{ slug: string }>();
+  const { isAuthenticated, user } = useAuth();
   const [currentImage, setCurrentImage] = useState(0);
   const [showGallery, setShowGallery] = useState(false);
   const [selectedTab, setSelectedTab] = useState('overview');
   const [selectedRoom, setSelectedRoom] = useState(0);
   const [bookingMonths, setBookingMonths] = useState(3);
   const [showBookingForm, setShowBookingForm] = useState(false);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [showCreditModal, setShowCreditModal] = useState(false);
+  const [pendingContactType, setPendingContactType] = useState<'call' | 'whatsapp' | null>(null);
+  const [creditBalance, setCreditBalance] = useState(0);
+  const [canReview, setCanReview] = useState(false);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
   const [bookingData, setBookingData] = useState({
     name: '',
     phone: '',
@@ -119,41 +133,124 @@ const PGDetail = () => {
   const [error, setError] = useState<string | null>(null);
   const [similarPGs, setSimilarPGs] = useState<any[]>([]);
   const [nearbyPGs, setNearbyPGs] = useState<any[]>([]);
-  
-  const [demandData, setDemandData] = useState<DemandMeterData>({
-    views: 0,
-    weeklyBookings: 0,
-    monthlyBookings: 0,
-    rating: 4.5,
-    reviewCount: 0,
-    demandLevel: 'Medium',
-    demandColor: 'bg-yellow-500',
-    demandPercentage: 60,
-    demandMessage: '📈 Good interest in this property. Check availability.'
-  });
-  const [loadingDemand, setLoadingDemand] = useState(true);
 
   const STATIC_PHONE = '9315058665';
 
-  const fetchDemandData = async (pgId: string) => {
+  // Fetch credit balance
+  const fetchCreditBalance = async () => {
+    if (!isAuthenticated) return;
     try {
-      setLoadingDemand(true);
-      const response = await api.request(`/api/pg/${pgId}/demand-meter`);
-      if (response.success && response.data) {
-        setDemandData(response.data);
+      const response = await api.request('/api/payments/credit-balance');
+      if (response.success) {
+        setCreditBalance(response.balance);
       }
     } catch (error) {
-      console.error('Error fetching demand data:', error);
-    } finally {
-      setLoadingDemand(false);
+      console.error('Error fetching credit balance:', error);
     }
   };
 
-  const incrementViewCount = async (pgId: string) => {
+  // Fetch reviews
+  const fetchReviews = async (pgId: string) => {
     try {
-      await api.request(`/api/pg/${pgId}/increment-view`, { method: 'POST' });
+      const response = await api.request(`/api/reviews/pg/${pgId}`);
+      if (response.success) {
+        setReviews(response.reviews || []);
+      }
     } catch (error) {
-      console.error('Error incrementing view:', error);
+      console.error('Error fetching reviews:', error);
+    }
+  };
+
+  // Check if user can review
+  const checkCanReview = async (pgId: string) => {
+    if (!isAuthenticated) return;
+    try {
+      const response = await api.request(`/api/bookings/can-review/${pgId}`);
+      if (response.success) {
+        setCanReview(response.canReview);
+      }
+    } catch (error) {
+      console.error('Error checking review eligibility:', error);
+    }
+  };
+
+  // Submit review
+  const submitReview = async () => {
+    if (!pg) return;
+    setSubmittingReview(true);
+    try {
+      const response = await api.request('/api/reviews', {
+        method: 'POST',
+        body: JSON.stringify({ 
+          pgId: pg._id, 
+          rating: reviewRating, 
+          comment: reviewComment 
+        })
+      });
+      
+      if (response.success) {
+        toast.success('Review submitted successfully!');
+        setShowReviewForm(false);
+        setCanReview(false);
+        fetchReviews(pg._id);
+        setReviewRating(5);
+        setReviewComment('');
+      } else {
+        toast.error(response.message || 'Failed to submit review');
+      }
+    } catch (error) {
+      console.error('Error submitting review:', error);
+      toast.error('Failed to submit review');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  // Handle contact with credit
+  const handleContactWithCredit = async (type: 'call' | 'whatsapp') => {
+    if (!isAuthenticated) {
+      toast.error('Please login to contact property owner');
+      return;
+    }
+
+    if (creditBalance < 1) {
+      setPendingContactType(type);
+      setShowCreditModal(true);
+      return;
+    }
+
+    try {
+      const response = await api.request('/api/payments/use-contact-credit', {
+        method: 'POST',
+        body: JSON.stringify({ pgId: pg?._id, contactType: type })
+      });
+
+      if (response.success) {
+        setCreditBalance(response.balance);
+        
+        if (type === 'call') {
+          window.location.href = `tel:${response.contactNumber || STATIC_PHONE}`;
+          toast.success(`Connecting you to ${pg?.name} owner`);
+        } else {
+          const message = encodeURIComponent(
+            `Hello,\n\nI'm interested in "${pg?.name}" on EasyTorent.\n` +
+            `📍 Price: ₹${pg?.price?.toLocaleString()}/month\n` +
+            `📍 Location: ${pg?.locality}, ${pg?.city}\n` +
+            `📍 Type: ${pg?.type}\n\n` +
+            `Could you please share more details about availability and amenities?\n\n` +
+            `Thanks!`
+          );
+          window.open(`https://wa.me/91${response.contactNumber || STATIC_PHONE}?text=${message}`, '_blank');
+          toast.success(`Opening WhatsApp chat with ${pg?.name} owner`);
+        }
+        
+        if (response.balance > 0) {
+          toast.info(`${response.balance} contact credits remaining`);
+        }
+      }
+    } catch (error) {
+      console.error('Error using credit:', error);
+      toast.error('Failed to connect. Please try again.');
     }
   };
 
@@ -183,8 +280,9 @@ const PGDetail = () => {
         
         if (response?.data) {
           setPg(response.data);
-          await fetchDemandData(response.data._id);
-          await incrementViewCount(response.data._id);
+          fetchReviews(response.data._id);
+          checkCanReview(response.data._id);
+          fetchCreditBalance();
           
           if (response.data.city) {
             fetchSimilarPGs(response.data.city, response.data._id);
@@ -195,6 +293,9 @@ const PGDetail = () => {
           throw new Error(response.message || "Failed to load PG");
         } else if (response) {
           setPg(response);
+          fetchReviews(response._id);
+          checkCanReview(response._id);
+          fetchCreditBalance();
           if (response.city) {
             fetchSimilarPGs(response.city, response._id);
             fetchNearbyLocations(response.city);
@@ -212,7 +313,7 @@ const PGDetail = () => {
     };
 
     fetchPG();
-  }, [slug]);
+  }, [slug, isAuthenticated]);
 
   const fetchSimilarPGs = async (city: string, currentId: string) => {
     try {
@@ -259,53 +360,50 @@ const PGDetail = () => {
     }
   }, [pg, bookingMonths]);
 
-  const handleBookingSubmit = (e: React.FormEvent) => {
+  const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const message = encodeURIComponent(
-      `*New Booking Request*\n\n` +
-      `*PG:* ${pg?.name}\n` +
-      `*Location:* ${pg?.address}\n` +
-      `*Price:* ₹${pg?.price}/month\n` +
-      `*Duration:* ${bookingMonths} months\n` +
-      `*Total:* ₹${calculatedPrice}\n\n` +
-      `*Guest Details:*\n` +
-      `*Name:* ${bookingData.name}\n` +
-      `*Phone:* ${bookingData.phone}\n` +
-      `*Email:* ${bookingData.email}\n` +
-      `*Move-in Date:* ${bookingData.moveInDate}\n` +
-      `*Message:* ${bookingData.message || 'No additional message'}`
-    );
-    
-    window.open(`https://wa.me/91${STATIC_PHONE}?text=${message}`, '_blank');
-    
-    toast.success('Redirecting to WhatsApp for booking!');
-    setShowBookingForm(false);
-    setBookingData({
-      name: '',
-      phone: '',
-      email: '',
-      message: '',
-      moveInDate: '',
-    });
+    try {
+      const response = await api.request('/api/bookings', {
+        method: 'POST',
+        body: JSON.stringify({
+          pgId: pg?._id,
+          roomType: roomDetails[selectedRoom].type,
+          checkInDate: bookingData.moveInDate,
+          checkOutDate: new Date(new Date(bookingData.moveInDate).setMonth(new Date(bookingData.moveInDate).getMonth() + bookingMonths)),
+          durationMonths: bookingMonths,
+          totalAmount: calculatedPrice,
+          guestDetails: {
+            name: bookingData.name,
+            phone: bookingData.phone,
+            email: bookingData.email
+          },
+          specialRequests: bookingData.message
+        })
+      });
+
+      if (response.success) {
+        toast.success('Booking confirmed successfully!');
+        setShowBookingForm(false);
+        setBookingData({
+          name: '',
+          phone: '',
+          email: '',
+          message: '',
+          moveInDate: '',
+        });
+        checkCanReview(pg?._id || '');
+      } else {
+        toast.error(response.message || 'Booking failed');
+      }
+    } catch (error) {
+      console.error('Error creating booking:', error);
+      toast.error('Failed to create booking');
+    }
   };
 
-  const handleWhatsAppContact = () => {
-    const message = encodeURIComponent(
-      `Hello,\n\nI'm interested in your PG:\n` +
-      `• Name: ${pg?.name}\n` +
-      `• Location: ${pg?.address}\n` +
-      `• Price: ₹${pg?.price}/month\n\n` +
-      `Please provide more information.`
-    );
-    window.open(`https://wa.me/91${STATIC_PHONE}?text=${message}`, '_blank');
-    toast.success('Opening WhatsApp chat');
-  };
-
-  const handlePhoneCall = () => {
-    window.location.href = `tel:${STATIC_PHONE}`;
-    toast.success('Connecting you to the owner...');
-  };
+  const handleWhatsAppContact = () => handleContactWithCredit('whatsapp');
+  const handlePhoneCall = () => handleContactWithCredit('call');
 
   const viewOnMap = () => {
     if (!pg) return;
@@ -423,10 +521,12 @@ const PGDetail = () => {
                   </Badge>
                 </Link>
               )}
-              <Badge className="bg-orange-100 text-orange-700 border-orange-200">
-                <TrendingUp className="h-3 w-3 mr-1" />
-                Trending at CU
-              </Badge>
+              {pg.verified && (
+                <Badge className="bg-green-100 text-green-700 border-green-200">
+                  <Verified className="h-3 w-3 mr-1" />
+                  Verified Property
+                </Badge>
+              )}
             </div>
           </div>
         </div>
@@ -465,7 +565,7 @@ const PGDetail = () => {
           </div>
         </div>
 
-        {/* ✅ VIRTUAL TOUR SECTION */}
+        {/* Virtual Tour Section */}
         {(pg.videoUrl || pg.virtualTour) && (
           <div className="container mx-auto px-4 mb-8">
             <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
@@ -580,10 +680,18 @@ const PGDetail = () => {
                   </Link>
                   <div className="flex items-center gap-2">
                     <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                    <span className="font-bold text-gray-900">{demandData.rating || pg.rating || 4.5}</span>
-                    <span>({demandData.reviewCount || pg.reviewCount || 0} reviews)</span>
+                    <span className="font-bold text-gray-900">{pg.rating || 4.5}</span>
+                    <span>({reviews.length || pg.reviewCount || 0} reviews)</span>
                   </div>
                 </div>
+
+                {/* Credit Balance Indicator */}
+                {isAuthenticated && creditBalance > 0 && (
+                  <div className="mb-4 flex items-center gap-2 p-2 bg-green-50 rounded-lg w-fit">
+                    <Sparkles className="h-4 w-4 text-green-600" />
+                    <span className="text-sm font-medium text-green-600">{creditBalance} contact credits available</span>
+                  </div>
+                )}
 
                 {/* Quick Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -604,50 +712,11 @@ const PGDetail = () => {
                     <div className="text-sm text-gray-600">Amenities</div>
                   </div>
                 </div>
-
-                {/* REAL-TIME DEMAND METER */}
-                {!loadingDemand ? (
-                  <div className={`mt-6 bg-gradient-to-r ${demandData.demandLevel === 'Very High' ? 'from-red-50 to-orange-50' : demandData.demandLevel === 'High' ? 'from-orange-50 to-red-50' : 'from-yellow-50 to-orange-50'} rounded-xl p-4`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-700">🔥 Demand Meter</span>
-                      <span className={`text-sm font-bold px-2 py-0.5 rounded-full text-white ${
-                        demandData.demandColor === 'bg-red-500' ? 'bg-red-500' : 
-                        demandData.demandColor === 'bg-orange-500' ? 'bg-orange-500' : 
-                        demandData.demandColor === 'bg-yellow-500' ? 'bg-yellow-600' : 'bg-green-500'
-                      }`}>
-                        {demandData.demandLevel} Demand
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className={`${demandData.demandColor} h-2 rounded-full transition-all duration-500`} 
-                        style={{ width: `${demandData.demandPercentage}%` }}
-                      ></div>
-                    </div>
-                    <div className="flex justify-between mt-2 text-xs text-gray-500">
-                      <span>👁️ {demandData.views} views today</span>
-                      <span>📅 {demandData.weeklyBookings} booked this week</span>
-                      <span>⭐ {demandData.rating} rating</span>
-                    </div>
-                    <p className={`text-xs mt-2 ${
-                      demandData.demandLevel === 'Very High' ? 'text-red-600' : 
-                      demandData.demandLevel === 'High' ? 'text-orange-600' : 'text-yellow-600'
-                    }`}>
-                      {demandData.demandMessage}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="mt-6 bg-gray-100 rounded-xl p-4 animate-pulse">
-                    <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
-                    <div className="h-2 bg-gray-200 rounded w-full mb-2"></div>
-                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                  </div>
-                )}
               </div>
 
               {/* Tabs */}
               <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-4 bg-gray-100 p-1 rounded-xl">
+                <TabsList className="grid w-full grid-cols-5 bg-gray-100 p-1 rounded-xl">
                   <TabsTrigger value="overview" className="rounded-lg data-[state=active]:bg-white">
                     Overview
                   </TabsTrigger>
@@ -659,6 +728,9 @@ const PGDetail = () => {
                   </TabsTrigger>
                   <TabsTrigger value="location" className="rounded-lg data-[state=active]:bg-white">
                     Location
+                  </TabsTrigger>
+                  <TabsTrigger value="reviews" className="rounded-lg data-[state=active]:bg-white">
+                    Reviews
                   </TabsTrigger>
                 </TabsList>
 
@@ -823,6 +895,84 @@ const PGDetail = () => {
                     </div>
                   </div>
                 </TabsContent>
+
+                <TabsContent value="reviews" className="mt-6">
+                  <div className="bg-white rounded-xl p-6 border">
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-xl font-bold text-gray-900">Guest Reviews</h2>
+                      {canReview && (
+                        <Button 
+                          onClick={() => setShowReviewForm(true)}
+                          className="bg-orange-600 hover:bg-orange-700 gap-2"
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                          Write a Review
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* Review Stats */}
+                    <div className="flex items-center gap-6 mb-6 pb-6 border-b">
+                      <div className="text-center">
+                        <div className="text-4xl font-bold text-gray-900">{pg.rating || 4.5}</div>
+                        <div className="flex items-center gap-1 mt-1">
+                          {[...Array(5)].map((_, i) => (
+                            <Star key={i} className={cn(
+                              "h-4 w-4",
+                              i < Math.floor(pg.rating || 4.5) 
+                                ? "fill-yellow-400 text-yellow-400" 
+                                : "text-gray-300"
+                            )} />
+                          ))}
+                        </div>
+                        <div className="text-sm text-gray-500 mt-1">{reviews.length} reviews</div>
+                      </div>
+                    </div>
+
+                    {/* Reviews List */}
+                    <div className="space-y-6">
+                      {reviews.length > 0 ? (
+                        reviews.map((review) => (
+                          <div key={review._id} className="border-b pb-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 flex items-center justify-center text-white font-bold">
+                                  {review.userName?.charAt(0) || 'U'}
+                                </div>
+                                <div>
+                                  <p className="font-medium text-gray-900">{review.userName}</p>
+                                  <p className="text-xs text-gray-500">
+                                    {new Date(review.createdAt).toLocaleDateString('en-IN', {
+                                      year: 'numeric',
+                                      month: 'long',
+                                      day: 'numeric'
+                                    })}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                <span className="font-medium">{review.rating}</span>
+                              </div>
+                            </div>
+                            <p className="text-gray-700 mt-2">{review.comment}</p>
+                            {review.verifiedBooking && (
+                              <Badge className="mt-2 bg-green-100 text-green-700 text-xs gap-1">
+                                <Verified className="h-3 w-3" />
+                                Verified Booking
+                              </Badge>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8">
+                          <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                          <p className="text-gray-500">No reviews yet. Be the first to review!</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </TabsContent>
               </Tabs>
 
               {similarPGs.length > 0 && (
@@ -941,7 +1091,7 @@ const PGDetail = () => {
                     className="w-full bg-green-600 hover:bg-green-700 gap-2"
                   >
                     <Phone className="h-4 w-4" />
-                    Call Owner
+                    Call Owner {creditBalance < 1 && '(1 credit)'}
                   </Button>
                   
                   <Button 
@@ -951,7 +1101,7 @@ const PGDetail = () => {
                     className="w-full border-green-600 text-green-700 hover:bg-green-50 gap-2"
                   >
                     <MessageCircle className="h-4 w-4" />
-                    WhatsApp
+                    WhatsApp {creditBalance < 1 && '(1 credit)'}
                   </Button>
                 </div>
 
@@ -968,7 +1118,16 @@ const PGDetail = () => {
                   
                   <div className="text-center border-t pt-4">
                     <p className="text-sm text-gray-600 mb-2">Contact for inquiries:</p>
-                    <p className="text-sm text-gray-500">Available 24/7 for your queries</p>
+                    <p className="text-xs text-gray-500">Each call/WhatsApp uses 1 credit</p>
+                    {creditBalance === 0 && isAuthenticated && (
+                      <Button 
+                        variant="link" 
+                        className="text-orange-600 text-xs mt-1"
+                        onClick={() => setShowCreditModal(true)}
+                      >
+                        Get 4 credits for ₹10 →
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1104,18 +1263,82 @@ const PGDetail = () => {
                 <div className="bg-blue-50 p-3 rounded-lg">
                   <p className="text-sm text-blue-800 flex items-center gap-2">
                     <MessageCircle className="h-4 w-4" />
-                    Your booking request will be sent via WhatsApp to the owner
+                    Your booking will be confirmed instantly
                   </p>
                 </div>
                 
                 <Button type="submit" className="w-full bg-orange-600 hover:bg-orange-700">
-                  Confirm Booking via WhatsApp
+                  Confirm Booking
                 </Button>
               </form>
             </div>
           </div>
         </div>
       )}
+
+      {/* Review Form Modal */}
+      <Dialog open={showReviewForm} onOpenChange={setShowReviewForm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Write a Review</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Rating</label>
+              <div className="flex gap-2">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    onClick={() => setReviewRating(star)}
+                    className="focus:outline-none"
+                  >
+                    <Star className={cn(
+                      "h-8 w-8 transition-all",
+                      star <= reviewRating 
+                        ? "fill-yellow-400 text-yellow-400" 
+                        : "text-gray-300"
+                    )} />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Your Review</label>
+              <textarea
+                value={reviewComment}
+                onChange={(e) => setReviewComment(e.target.value)}
+                rows={4}
+                className="w-full px-3 py-2 border rounded-lg focus:border-orange-500 outline-none"
+                placeholder="Share your experience..."
+              />
+            </div>
+            <Button 
+              onClick={submitReview} 
+              disabled={submittingReview}
+              className="w-full bg-orange-600 hover:bg-orange-700"
+            >
+              {submittingReview ? 'Submitting...' : 'Submit Review'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Credit Purchase Modal */}
+      <CreditPurchaseModal
+        isOpen={showCreditModal}
+        onClose={() => {
+          setShowCreditModal(false);
+          setPendingContactType(null);
+        }}
+        onSuccess={() => {
+          fetchCreditBalance();
+          if (pendingContactType) {
+            setTimeout(() => {
+              handleContactWithCredit(pendingContactType);
+            }, 500);
+          }
+        }}
+      />
 
       <Footer />
     </div>

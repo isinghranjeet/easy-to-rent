@@ -34,7 +34,7 @@ import RegisterPropertyPage from "./pages/RegisterPropertyPage";
 // Location Page
 import LocationPage from "./pages/LocationPage";
 
-// ✅ Auth Callback for Google Login
+// Auth Callback for Google Login
 import AuthCallback from "./pages/AuthCallback";
 
 import { useAuth } from "./contexts/AuthContext";
@@ -97,7 +97,7 @@ const App = () => (
                 {/* Location Route */}
                 <Route path="/location/:slug" element={<RoleGate><LocationPage /></RoleGate>} />
 
-                {/* ✅ Auth Callback Route (Google Login Redirect) */}
+                {/* Auth Callback Route (Google Login Redirect) */}
                 <Route path="/auth/callback" element={<AuthCallback />} />
 
                 {/* ================= Admin Routes ================= */}
