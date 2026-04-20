@@ -231,12 +231,26 @@ export function Navbar() {
                 </div>
               ) : (
                 <div className="flex items-center gap-3">
+                  {/* IMPROVED REGISTER PROPERTY BUTTON - DESKTOP */}
                   <Link to="/owner/register">
-                    <Button variant="ghost" className="hidden xl:flex items-center gap-2 text-gray-700 hover:text-orange-600 hover:bg-orange-50 transition-all duration-300">
-                      <Plus className="h-4 w-4 text-orange-500" />
-                      Register Your Property
+                    <Button 
+                      variant="outline" 
+                      className="group relative overflow-hidden px-5 py-2.5 border-2 border-orange-500 bg-white hover:bg-orange-50 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Plus className="h-4 w-4 text-orange-500 group-hover:text-orange-600 transition-colors" />
+                        <span className="font-semibold text-gray-800 group-hover:text-orange-700">
+                          Register Property
+                        </span>
+                        <span className="font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-md text-sm">
+                          Free
+                        </span>
+                      </div>
+                      {/* Animated underline effect */}
+                      <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-orange-500 to-orange-600 group-hover:w-full transition-all duration-300"></span>
                     </Button>
                   </Link>
+                  
                   <Link to="/login">
                     <Button className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-md shadow-orange-200 transform hover:scale-105 transition-all duration-300">
                       <LogIn className="h-4 w-4" />
@@ -487,14 +501,19 @@ export function Navbar() {
                 </>
               ) : (
                   <div className="flex flex-col gap-2">
+                    {/* IMPROVED REGISTER PROPERTY BUTTON - MOBILE */}
                     <Link
                       to="/owner/register"
                       onClick={() => setIsOpen(false)}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-orange-200 text-orange-600 rounded-xl hover:bg-orange-50 transition-all duration-300 font-medium text-sm sm:text-base"
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-orange-500 bg-white text-gray-800 rounded-xl hover:bg-orange-50 transition-all duration-300 font-medium text-sm sm:text-base group"
                     >
-                      <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
-                      Register Your Property
+                      <Plus className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500 group-hover:text-orange-600" />
+                      <span>Register Property</span>
+                      <span className="font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-md text-xs sm:text-sm">
+                        Free
+                      </span>
                     </Link>
+                    
                     <Link
                       to="/login"
                       onClick={() => setIsOpen(false)}
