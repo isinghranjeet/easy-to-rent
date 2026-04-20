@@ -13,7 +13,8 @@ import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { AirbnbMap } from '@/components/map/AirbnbMap';
 import { PriceAlertButton } from '@/components/pg/PriceAlertButton';
-import { CreditPurchaseModal } from '@/components/pg/CreditPurchaseModal';
+// COMMENTED OUT - Payment related imports
+// import { CreditPurchaseModal } from '@/components/pg/CreditPurchaseModal';
 import { api } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -109,9 +110,12 @@ const PGDetail = () => {
   const [bookingMonths, setBookingMonths] = useState(3);
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
-  const [showCreditModal, setShowCreditModal] = useState(false);
-  const [pendingContactType, setPendingContactType] = useState<'call' | 'whatsapp' | null>(null);
-  const [creditBalance, setCreditBalance] = useState(0);
+  
+  // COMMENTED OUT - Payment related states
+  // const [showCreditModal, setShowCreditModal] = useState(false);
+  // const [pendingContactType, setPendingContactType] = useState<'call' | 'whatsapp' | null>(null);
+  // const [creditBalance, setCreditBalance] = useState(0);
+  
   const [canReview, setCanReview] = useState(false);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [reviewRating, setReviewRating] = useState(5);
@@ -136,18 +140,18 @@ const PGDetail = () => {
 
   const STATIC_PHONE = '9315058665';
 
-  // Fetch credit balance
-  const fetchCreditBalance = async () => {
-    if (!isAuthenticated) return;
-    try {
-      const response = await api.request('/api/payments/credit-balance');
-      if (response.success) {
-        setCreditBalance(response.balance);
-      }
-    } catch (error) {
-      console.error('Error fetching credit balance:', error);
-    }
-  };
+  // COMMENTED OUT - Credit balance fetch
+  // const fetchCreditBalance = async () => {
+  //   if (!isAuthenticated) return;
+  //   try {
+  //     const response = await api.request('/api/payments/credit-balance');
+  //     if (response.success) {
+  //       setCreditBalance(response.balance);
+  //     }
+  //   } catch (error) {
+  //     console.error('Error fetching credit balance:', error);
+  //   }
+  // };
 
   // Fetch reviews
   const fetchReviews = async (pgId: string) => {
@@ -206,51 +210,38 @@ const PGDetail = () => {
     }
   };
 
-  // Handle contact with credit
-  const handleContactWithCredit = async (type: 'call' | 'whatsapp') => {
+  // COMMENTED OUT - Handle contact with credit
+  // const handleContactWithCredit = async (type: 'call' | 'whatsapp') => {
+  //   if (!isAuthenticated) {
+  //     toast.error('Please login to contact property owner');
+  //     return;
+  //   }
+  //   ... rest of payment code
+  // };
+
+  // SIMPLIFIED - Direct contact without payment
+  const handleContact = (type: 'call' | 'whatsapp') => {
     if (!isAuthenticated) {
       toast.error('Please login to contact property owner');
       return;
     }
 
-    if (creditBalance < 1) {
-      setPendingContactType(type);
-      setShowCreditModal(true);
-      return;
-    }
+    const phoneNumber = pg?.ownerPhone || STATIC_PHONE;
 
-    try {
-      const response = await api.request('/api/payments/use-contact-credit', {
-        method: 'POST',
-        body: JSON.stringify({ pgId: pg?._id, contactType: type })
-      });
-
-      if (response.success) {
-        setCreditBalance(response.balance);
-        
-        if (type === 'call') {
-          window.location.href = `tel:${response.contactNumber || STATIC_PHONE}`;
-          toast.success(`Connecting you to ${pg?.name} owner`);
-        } else {
-          const message = encodeURIComponent(
-            `Hello,\n\nI'm interested in "${pg?.name}" on EasyTorent.\n` +
-            `📍 Price: ₹${pg?.price?.toLocaleString()}/month\n` +
-            `📍 Location: ${pg?.locality}, ${pg?.city}\n` +
-            `📍 Type: ${pg?.type}\n\n` +
-            `Could you please share more details about availability and amenities?\n\n` +
-            `Thanks!`
-          );
-          window.open(`https://wa.me/91${response.contactNumber || STATIC_PHONE}?text=${message}`, '_blank');
-          toast.success(`Opening WhatsApp chat with ${pg?.name} owner`);
-        }
-        
-        if (response.balance > 0) {
-          toast.info(`${response.balance} contact credits remaining`);
-        }
-      }
-    } catch (error) {
-      console.error('Error using credit:', error);
-      toast.error('Failed to connect. Please try again.');
+    if (type === 'call') {
+      window.location.href = `tel:${phoneNumber}`;
+      toast.success(`Connecting you to ${pg?.name} owner`);
+    } else {
+      const message = encodeURIComponent(
+        `Hello,\n\nI'm interested in "${pg?.name}" on EasyTorent.\n` +
+        `📍 Price: ₹${pg?.price?.toLocaleString()}/month\n` +
+        `📍 Location: ${pg?.locality}, ${pg?.city}\n` +
+        `📍 Type: ${pg?.type}\n\n` +
+        `Could you please share more details about availability and amenities?\n\n` +
+        `Thanks!`
+      );
+      window.open(`https://wa.me/91${phoneNumber}?text=${message}`, '_blank');
+      toast.success(`Opening WhatsApp chat with ${pg?.name} owner`);
     }
   };
 
@@ -282,7 +273,7 @@ const PGDetail = () => {
           setPg(response.data);
           fetchReviews(response.data._id);
           checkCanReview(response.data._id);
-          fetchCreditBalance();
+          // fetchCreditBalance(); // COMMENTED OUT
           
           if (response.data.city) {
             fetchSimilarPGs(response.data.city, response.data._id);
@@ -295,7 +286,7 @@ const PGDetail = () => {
           setPg(response);
           fetchReviews(response._id);
           checkCanReview(response._id);
-          fetchCreditBalance();
+          // fetchCreditBalance(); // COMMENTED OUT
           if (response.city) {
             fetchSimilarPGs(response.city, response._id);
             fetchNearbyLocations(response.city);
@@ -402,8 +393,13 @@ const PGDetail = () => {
     }
   };
 
-  const handleWhatsAppContact = () => handleContactWithCredit('whatsapp');
-  const handlePhoneCall = () => handleContactWithCredit('call');
+  // COMMENTED OUT - Payment contact handlers
+  // const handleWhatsAppContact = () => handleContactWithCredit('whatsapp');
+  // const handlePhoneCall = () => handleContactWithCredit('call');
+  
+  // SIMPLIFIED - Direct contact handlers
+  const handleWhatsAppContact = () => handleContact('whatsapp');
+  const handlePhoneCall = () => handleContact('call');
 
   const viewOnMap = () => {
     if (!pg) return;
@@ -685,13 +681,13 @@ const PGDetail = () => {
                   </div>
                 </div>
 
-                {/* Credit Balance Indicator */}
-                {isAuthenticated && creditBalance > 0 && (
+                {/* COMMENTED OUT - Credit Balance Indicator */}
+                {/* {isAuthenticated && creditBalance > 0 && (
                   <div className="mb-4 flex items-center gap-2 p-2 bg-green-50 rounded-lg w-fit">
                     <Sparkles className="h-4 w-4 text-green-600" />
                     <span className="text-sm font-medium text-green-600">{creditBalance} contact credits available</span>
                   </div>
-                )}
+                )} */}
 
                 {/* Quick Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1084,6 +1080,7 @@ const PGDetail = () => {
                   Book Now
                 </Button>
 
+                {/* SIMPLIFIED - Direct contact buttons without credit info */}
                 <div className="space-y-3 mb-6">
                   <Button 
                     onClick={handlePhoneCall} 
@@ -1091,7 +1088,7 @@ const PGDetail = () => {
                     className="w-full bg-green-600 hover:bg-green-700 gap-2"
                   >
                     <Phone className="h-4 w-4" />
-                    Call Owner {creditBalance < 1 && '(1 credit)'}
+                    Call Owner
                   </Button>
                   
                   <Button 
@@ -1101,7 +1098,7 @@ const PGDetail = () => {
                     className="w-full border-green-600 text-green-700 hover:bg-green-50 gap-2"
                   >
                     <MessageCircle className="h-4 w-4" />
-                    WhatsApp {creditBalance < 1 && '(1 credit)'}
+                    WhatsApp
                   </Button>
                 </div>
 
@@ -1118,16 +1115,7 @@ const PGDetail = () => {
                   
                   <div className="text-center border-t pt-4">
                     <p className="text-sm text-gray-600 mb-2">Contact for inquiries:</p>
-                    <p className="text-xs text-gray-500">Each call/WhatsApp uses 1 credit</p>
-                    {creditBalance === 0 && isAuthenticated && (
-                      <Button 
-                        variant="link" 
-                        className="text-orange-600 text-xs mt-1"
-                        onClick={() => setShowCreditModal(true)}
-                      >
-                        Get 4 credits for ₹10 →
-                      </Button>
-                    )}
+                    <p className="text-sm text-gray-500">Available 24/7 for your queries</p>
                   </div>
                 </div>
               </div>
@@ -1323,8 +1311,8 @@ const PGDetail = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Credit Purchase Modal */}
-      <CreditPurchaseModal
+      {/* COMMENTED OUT - Credit Purchase Modal */}
+      {/* <CreditPurchaseModal
         isOpen={showCreditModal}
         onClose={() => {
           setShowCreditModal(false);
@@ -1338,7 +1326,7 @@ const PGDetail = () => {
             }, 500);
           }
         }}
-      />
+      /> */}
 
       <Footer />
     </div>

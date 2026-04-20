@@ -112,7 +112,7 @@ interface ApiResponse<T = any> {
 // ────────────────────── Cache Class ──────────────────────
 class RequestCache {
   private cache: Map<string, { data: any; timestamp: number }> = new Map();
-  private cacheDuration: number = 5 * 60 * 1000; // 5 minutes default
+  private cacheDuration: number = 5 * 60 * 1000;
   private pendingRequests: Map<string, Promise<any>> = new Map();
 
   constructor(duration?: number) {
@@ -139,10 +139,7 @@ class RequestCache {
   }
 
   set(key: string, data: any): void {
-    this.cache.set(key, {
-      data,
-      timestamp: Date.now()
-    });
+    this.cache.set(key, { data, timestamp: Date.now() });
     console.log(`💾 [CACHE_SET] ${key}`);
   }
 
@@ -166,9 +163,7 @@ class RequestCache {
 
   setPendingRequest(key: string, promise: Promise<any>): void {
     this.pendingRequests.set(key, promise);
-    promise.finally(() => {
-      this.pendingRequests.delete(key);
-    });
+    promise.finally(() => this.pendingRequests.delete(key));
   }
 }
 
@@ -248,9 +243,7 @@ export class ApiService {
     
     if (isGetRequest && !skipCache && !endpoint.includes('/api/wishlist')) {
       const cached = this.cache.get<T>(cacheKey);
-      if (cached) {
-        return cached;
-      }
+      if (cached) return cached;
       
       const pending = this.cache.getPendingRequest<T>(cacheKey);
       if (pending) {
@@ -298,9 +291,25 @@ export class ApiService {
             throw error;
           }
           
+          // ✅ FIXED: Better 401 handling - don't clear token for payment routes
           if (response.status === 401) {
-            this.clearToken();
+            console.warn(`🔐 [AUTH] 401 Unauthorized for ${endpoint}`);
+            
+            // Don't clear token for payment/recommendation/booking routes
+            const isProtectedRoute = endpoint.includes('/api/payments/') || 
+                                      endpoint.includes('/api/recommendations/') ||
+                                      endpoint.includes('/api/bookings/');
+            
+            if (!isProtectedRoute) {
+              this.clearToken();
+            }
+            
+            // Dispatch event for UI to handle
             window.dispatchEvent(new Event('unauthorized'));
+            
+            const error: any = new Error(data.message || 'Unauthorized');
+            error.status = 401;
+            throw error;
           }
           
           const error: any = new Error(data.message || data.error || `Request failed with status ${response.status}`);
@@ -353,10 +362,7 @@ export class ApiService {
       return {
         success: true,
         message: response.message,
-        data: {
-          token,
-          user: userData as User,
-        },
+        data: { token, user: userData as User },
       };
     }
 
@@ -377,10 +383,7 @@ export class ApiService {
       return {
         success: true,
         message: response.message,
-        data: {
-          token,
-          user: userData as User,
-        },
+        data: { token, user: userData as User },
       };
     }
 
@@ -413,10 +416,7 @@ export class ApiService {
       return {
         success: true,
         message: response.message,
-        data: {
-          token,
-          user: userData as User,
-        },
+        data: { token, user: userData as User },
       };
     }
 
@@ -435,14 +435,8 @@ export class ApiService {
   // ────────────────── Wishlist Endpoints ──────────────────
 
   async getWishlist(): Promise<ApiResponse<PGListing[]>> {
-    const response = await this.request<ApiResponse<PGListing[]>>('/api/wishlist', {
-      method: 'GET',
-    }, true);
-    
-    if (response.success && !response.data) {
-      response.data = [];
-    }
-    
+    const response = await this.request<ApiResponse<PGListing[]>>('/api/wishlist', { method: 'GET' }, true);
+    if (response.success && !response.data) response.data = [];
     return response;
   }
 
@@ -466,18 +460,14 @@ export class ApiService {
   }
 
   async clearWishlist(): Promise<ApiResponse<{ message: string }>> {
-    const response = await this.request<ApiResponse<{ message: string }>>('/api/wishlist', {
-      method: 'DELETE',
-    });
+    const response = await this.request<ApiResponse<{ message: string }>>('/api/wishlist', { method: 'DELETE' });
     this.clearWishlistCache();
     this.clearPGCache();
     return response;
   }
 
   async checkInWishlist(pgId: string): Promise<ApiResponse<{ inWishlist: boolean }>> {
-    return this.request<ApiResponse<{ inWishlist: boolean }>>(`/api/wishlist/check/${pgId}`, {
-      method: 'GET',
-    });
+    return this.request<ApiResponse<{ inWishlist: boolean }>>(`/api/wishlist/check/${pgId}`, { method: 'GET' });
   }
 
   // ────────────────── Compare Endpoints ──────────────────
@@ -496,17 +486,13 @@ export class ApiService {
   }
 
   async removeFromCompare(pgId: string): Promise<ApiResponse<{ message: string }>> {
-    const response = await this.request(`/api/compare/${pgId}`, {
-      method: 'DELETE'
-    });
+    const response = await this.request(`/api/compare/${pgId}`, { method: 'DELETE' });
     this.clearCache();
     return response;
   }
 
   async clearCompare(): Promise<ApiResponse<{ message: string }>> {
-    const response = await this.request('/api/compare', {
-      method: 'DELETE'
-    });
+    const response = await this.request('/api/compare', { method: 'DELETE' });
     this.clearCache();
     return response;
   }
@@ -523,10 +509,7 @@ export class ApiService {
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
     
-    return this.request(
-      `/api/locations${queryParams.toString() ? `?${queryParams}` : ''}`,
-      { method: 'GET' }
-    );
+    return this.request(`/api/locations${queryParams.toString() ? `?${queryParams}` : ''}`, { method: 'GET' });
   }
 
   async getPopularLocations(limit: number = 10): Promise<ApiResponse<any[]>> {
@@ -541,12 +524,7 @@ export class ApiService {
   }
 
   async getLocationBySlug(slug: string, params?: { 
-    page?: number; 
-    limit?: number; 
-    sort?: string; 
-    type?: string; 
-    minPrice?: number; 
-    maxPrice?: number 
+    page?: number; limit?: number; sort?: string; type?: string; minPrice?: number; maxPrice?: number 
   }): Promise<ApiResponse<any>> {
     const queryParams = new URLSearchParams();
     if (params?.page) queryParams.append('page', params.page.toString());
@@ -556,10 +534,7 @@ export class ApiService {
     if (params?.minPrice) queryParams.append('minPrice', params.minPrice.toString());
     if (params?.maxPrice) queryParams.append('maxPrice', params.maxPrice.toString());
     
-    return this.request(
-      `/api/locations/${slug}${queryParams.toString() ? `?${queryParams}` : ''}`,
-      { method: 'GET' }
-    );
+    return this.request(`/api/locations/${slug}${queryParams.toString() ? `?${queryParams}` : ''}`, { method: 'GET' });
   }
 
   async filterPGsByLocation(filters: {
@@ -606,28 +581,20 @@ export class ApiService {
 
   async createPGListing(data: Partial<PGListing> | FormData): Promise<ApiResponse<PGListing>> {
     const body = data instanceof FormData ? data : JSON.stringify(data);
-    const response = await this.request<ApiResponse<PGListing>>('/api/pg', {
-      method: 'POST',
-      body,
-    });
+    const response = await this.request<ApiResponse<PGListing>>('/api/pg', { method: 'POST', body });
     this.clearPGCache();
     return response;
   }
 
   async updatePGListing(id: string, data: Partial<PGListing> | FormData): Promise<ApiResponse<PGListing>> {
     const body = data instanceof FormData ? data : JSON.stringify(data);
-    const response = await this.request<ApiResponse<PGListing>>(`/api/pg/${id}`, {
-      method: 'PUT',
-      body,
-    });
+    const response = await this.request<ApiResponse<PGListing>>(`/api/pg/${id}`, { method: 'PUT', body });
     this.clearPGCache();
     return response;
   }
 
   async deletePGListing(id: string): Promise<ApiResponse<{ id: string }>> {
-    const response = await this.request<ApiResponse<{ id: string }>>(`/api/pg/${id}`, {
-      method: 'DELETE',
-    });
+    const response = await this.request<ApiResponse<{ id: string }>>(`/api/pg/${id}`, { method: 'DELETE' });
     this.clearPGCache();
     return response;
   }
@@ -642,48 +609,23 @@ export class ApiService {
     return this.request('/api/payments/credit-balance', { method: 'GET' });
   }
 
-  async createCallCreditOrder(amount: number = 10): Promise<ApiResponse<{
-    orderId: string;
-    amount: number;
-    currency: string;
-    keyId: string;
-  }>> {
+  async createCallCreditOrder(amount: number = 10): Promise<ApiResponse<{ orderId: string; amount: number; currency: string; keyId: string }>> {
     return this.request('/api/payments/create-call-credit-order', {
       method: 'POST',
       body: JSON.stringify({ amount })
     });
   }
 
-  async verifyCallCreditPayment(data: {
-    razorpay_order_id: string;
-    razorpay_payment_id: string;
-    razorpay_signature: string;
-  }): Promise<ApiResponse<{ balance: number }>> {
-    return this.request('/api/payments/verify-call-credit', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
+  async verifyCallCreditPayment(data: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }): Promise<ApiResponse<{ balance: number }>> {
+    return this.request('/api/payments/verify-call-credit', { method: 'POST', body: JSON.stringify(data) });
   }
 
-  async canContact(pgId: string, type: 'call' | 'whatsapp'): Promise<ApiResponse<{
-    canContact: boolean;
-    balance: number;
-    alreadyContacted?: boolean;
-  }>> {
-    return this.request('/api/payments/can-contact', {
-      method: 'POST',
-      body: JSON.stringify({ pgId, type })
-    });
+  async canContact(pgId: string, type: 'call' | 'whatsapp'): Promise<ApiResponse<{ canContact: boolean; balance: number; alreadyContacted?: boolean }>> {
+    return this.request('/api/payments/can-contact', { method: 'POST', body: JSON.stringify({ pgId, type }) });
   }
 
-  async useContactCredit(pgId: string, contactType: 'call' | 'whatsapp'): Promise<ApiResponse<{
-    balance: number;
-    contactNumber: string;
-  }>> {
-    return this.request('/api/payments/use-contact-credit', {
-      method: 'POST',
-      body: JSON.stringify({ pgId, contactType })
-    });
+  async useContactCredit(pgId: string, contactType: 'call' | 'whatsapp'): Promise<ApiResponse<{ balance: number; contactNumber: string }>> {
+    return this.request('/api/payments/use-contact-credit', { method: 'POST', body: JSON.stringify({ pgId, contactType }) });
   }
 
   // ────────────────── BOOKING ENDPOINTS ──────────────────
@@ -695,17 +637,10 @@ export class ApiService {
     checkOutDate: string;
     durationMonths: number;
     totalAmount: number;
-    guestDetails: {
-      name: string;
-      phone: string;
-      email?: string;
-    };
+    guestDetails: { name: string; phone: string; email?: string };
     specialRequests?: string;
   }): Promise<ApiResponse<{ bookingId: string }>> {
-    const response = await this.request('/api/bookings', {
-      method: 'POST',
-      body: JSON.stringify(bookingData)
-    });
+    const response = await this.request('/api/bookings', { method: 'POST', body: JSON.stringify(bookingData) });
     this.clearCache();
     return response;
   }
@@ -718,21 +653,13 @@ export class ApiService {
     return this.request(`/api/bookings/${bookingId}`, { method: 'GET' });
   }
 
-  async cancelBooking(bookingId: string, reason?: string): Promise<ApiResponse<{
-    refundAmount: number;
-  }>> {
-    const response = await this.request(`/api/bookings/${bookingId}`, {
-      method: 'DELETE',
-      body: JSON.stringify({ reason })
-    });
+  async cancelBooking(bookingId: string, reason?: string): Promise<ApiResponse<{ refundAmount: number }>> {
+    const response = await this.request(`/api/bookings/${bookingId}`, { method: 'DELETE', body: JSON.stringify({ reason }) });
     this.clearCache();
     return response;
   }
 
-  async canReview(pgId: string): Promise<ApiResponse<{
-    canReview: boolean;
-    bookingId?: string;
-  }>> {
+  async canReview(pgId: string): Promise<ApiResponse<{ canReview: boolean; bookingId?: string }>> {
     return this.request(`/api/bookings/can-review/${pgId}`, { method: 'GET' });
   }
 
@@ -742,32 +669,20 @@ export class ApiService {
     return this.request(`/api/reviews/pg/${pgId}`, { method: 'GET' });
   }
 
-  async submitReview(pgId: string, rating: number, comment: string): Promise<ApiResponse<{
-    reviewId: string;
-  }>> {
-    const response = await this.request('/api/reviews', {
-      method: 'POST',
-      body: JSON.stringify({ pgId, rating, comment })
-    });
+  async submitReview(pgId: string, rating: number, comment: string): Promise<ApiResponse<{ reviewId: string }>> {
+    const response = await this.request('/api/reviews', { method: 'POST', body: JSON.stringify({ pgId, rating, comment }) });
     this.clearPGCache();
     return response;
   }
 
-  async updateReview(reviewId: string, rating: number, comment: string): Promise<ApiResponse<{
-    reviewId: string;
-  }>> {
-    const response = await this.request(`/api/reviews/${reviewId}`, {
-      method: 'PUT',
-      body: JSON.stringify({ rating, comment })
-    });
+  async updateReview(reviewId: string, rating: number, comment: string): Promise<ApiResponse<{ reviewId: string }>> {
+    const response = await this.request(`/api/reviews/${reviewId}`, { method: 'PUT', body: JSON.stringify({ rating, comment }) });
     this.clearPGCache();
     return response;
   }
 
   async deleteReview(reviewId: string): Promise<ApiResponse<{ message: string }>> {
-    const response = await this.request(`/api/reviews/${reviewId}`, {
-      method: 'DELETE'
-    });
+    const response = await this.request(`/api/reviews/${reviewId}`, { method: 'DELETE' });
     this.clearPGCache();
     return response;
   }
@@ -776,18 +691,12 @@ export class ApiService {
 
   async getPersonalizedRecommendations(limit: number = 10): Promise<ApiResponse<{
     recommendations: PGListing[];
-    userPreferences: {
-      cities: string[];
-      types: string[];
-      topAmenities: string[];
-    };
+    userPreferences: { cities: string[]; types: string[]; topAmenities: string[] };
   }>> {
     try {
-      // Try to call the actual API
       return await this.request(`/api/recommendations/personalized?limit=${limit}`, { method: 'GET' });
     } catch (error) {
       console.log('Personalized recommendations API failed, using fallback...');
-      // Fallback: Get featured/high-rated PGs
       const pgResponse = await this.getPGs({ limit, sort: '-rating', featured: true });
       return {
         success: true,
@@ -804,11 +713,9 @@ export class ApiService {
     trending: (PGListing & { bookingCount: number; totalRevenue: number })[];
   }>> {
     try {
-      // Try to call the actual API
       return await this.request(`/api/recommendations/trending?limit=${limit}`, { method: 'GET' });
     } catch (error) {
       console.log('Trending API failed, using fallback...');
-      // Fallback: Get highest rated PGs
       const pgResponse = await this.getPGs({ limit, sort: '-rating' });
       const trendingWithMockData = (pgResponse.data?.items || []).map(pg => ({
         ...pg,
@@ -830,23 +737,15 @@ export class ApiService {
   }
 
   async createPriceAlert(pgId: string, desiredPrice: number): Promise<ApiResponse<any>> {
-    return this.request('/api/price-alerts', {
-      method: 'POST',
-      body: JSON.stringify({ pgId, desiredPrice })
-    });
+    return this.request('/api/price-alerts', { method: 'POST', body: JSON.stringify({ pgId, desiredPrice }) });
   }
 
   async updatePriceAlert(alertId: string, desiredPrice: number): Promise<ApiResponse<any>> {
-    return this.request(`/api/price-alerts/${alertId}`, {
-      method: 'PUT',
-      body: JSON.stringify({ desiredPrice })
-    });
+    return this.request(`/api/price-alerts/${alertId}`, { method: 'PUT', body: JSON.stringify({ desiredPrice }) });
   }
 
   async deletePriceAlert(alertId: string): Promise<ApiResponse<any>> {
-    return this.request(`/api/price-alerts/${alertId}`, {
-      method: 'DELETE'
-    });
+    return this.request(`/api/price-alerts/${alertId}`, { method: 'DELETE' });
   }
 
   // ────────────────── Admin Endpoints ──────────────────
@@ -860,9 +759,7 @@ export class ApiService {
   }
 
   async deleteUser(id: string): Promise<ApiResponse<{ deletedId: string }>> {
-    const response = await this.request<ApiResponse<{ deletedId: string }>>(`/api/auth/users/${id}`, {
-      method: 'DELETE',
-    });
+    const response = await this.request<ApiResponse<{ deletedId: string }>>(`/api/auth/users/${id}`, { method: 'DELETE' });
     this.cache.clearPattern(/\/api\/auth\/users/);
     return response;
   }
@@ -879,34 +776,19 @@ export class ApiService {
   // ────────────────── Notification Endpoints ──────────────────
 
   async sendWishlistReminder(): Promise<ApiResponse<{ message: string }>> {
-    return this.request('/api/notifications/wishlist-reminder', {
-      method: 'POST',
-    });
+    return this.request('/api/notifications/wishlist-reminder', { method: 'POST' });
   }
 
-  async sendBookingConfirmation(bookingDetails: {
-    pgName: string;
-    duration: number;
-    totalAmount: number;
-    moveInDate: string;
-  }): Promise<ApiResponse<{ message: string }>> {
-    return this.request('/api/notifications/booking-confirmation', {
-      method: 'POST',
-      body: JSON.stringify(bookingDetails),
-    });
+  async sendBookingConfirmation(bookingDetails: { pgName: string; duration: number; totalAmount: number; moveInDate: string }): Promise<ApiResponse<{ message: string }>> {
+    return this.request('/api/notifications/booking-confirmation', { method: 'POST', body: JSON.stringify(bookingDetails) });
   }
 
   async testNotification(): Promise<ApiResponse<{ message: string }>> {
-    return this.request('/api/notifications/test', {
-      method: 'POST',
-    });
+    return this.request('/api/notifications/test', { method: 'POST' });
   }
 
   async sendOfferEmail(email: string, name: string): Promise<ApiResponse<{ message: string }>> {
-    return this.request('/api/notifications/send-offer', {
-      method: 'POST',
-      body: JSON.stringify({ email, name }),
-    });
+    return this.request('/api/notifications/send-offer', { method: 'POST', body: JSON.stringify({ email, name }) });
   }
 
   // ────────────────── PG Demand & Views Endpoints ──────────────────
@@ -944,12 +826,7 @@ export class ApiService {
   async getOwnerListings(): Promise<ApiResponse<{
     items: PGListing[];
     total: number;
-    stats: {
-      totalViews: number;
-      totalInquiries: number;
-      totalBookings: number;
-      totalRevenue: number;
-    };
+    stats: { totalViews: number; totalInquiries: number; totalBookings: number; totalRevenue: number };
   }>> {
     return this.request('/api/pg/owner/listings', { method: 'GET' });
   }
@@ -959,10 +836,7 @@ export class ApiService {
   }
 
   async updateBookingStatus(bookingId: string, status: string): Promise<ApiResponse<Booking>> {
-    const response = await this.request(`/api/bookings/${bookingId}/status`, {
-      method: 'PUT',
-      body: JSON.stringify({ status })
-    });
+    const response = await this.request(`/api/bookings/${bookingId}/status`, { method: 'PUT', body: JSON.stringify({ status }) });
     this.clearCache();
     return response;
   }

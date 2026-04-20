@@ -13,6 +13,7 @@ interface AuthContextType {
   register: (name: string, email: string, password: string, phone?: string, role?: 'user' | 'owner') => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (userData: Partial<User>) => void;
+  refreshSession: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,6 +22,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     // Check for existing session
@@ -32,27 +34,61 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(false);
     }
 
-    // Listen for unauthorized events
+    // Listen for unauthorized events - DON'T auto logout immediately
     window.addEventListener('unauthorized', handleUnauthorized);
     return () => window.removeEventListener('unauthorized', handleUnauthorized);
   }, []);
 
-  const handleUnauthorized = () => {
-    setUser(null);
-    toast.error('Session expired. Please login again.');
+  const handleUnauthorized = async () => {
+    console.log('Unauthorized event received - attempting to refresh session');
+    
+    // Don't logout immediately - try to refresh session first
+    const refreshed = await refreshSession();
+    
+    if (!refreshed) {
+      // Only logout if refresh failed
+      console.log('Session refresh failed, logging out');
+      setUser(null);
+      api.clearToken();
+      toast.error('Session expired. Please login again.');
+    }
+  };
+
+  const refreshSession = async (): Promise<boolean> => {
+    if (isRefreshing) return false;
+    
+    setIsRefreshing(true);
+    try {
+      // Try to refresh token (if you have a refresh endpoint)
+      // For now, just try to load user with existing token
+      const response = await api.getCurrentUser();
+      if (response.success && response.data) {
+        setUser(response.data);
+        return true;
+      }
+    } catch (error) {
+      console.error('Session refresh failed:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+    return false;
   };
 
   const loadUser = async () => {
     try {
       const response = await api.getCurrentUser();
-      if (response.success) {
+      if (response.success && response.data) {
         setUser(response.data);
       } else {
         api.clearToken();
       }
     } catch (error) {
       console.error('Failed to load user:', error);
-      api.clearToken();
+      // Don't clear token on network errors
+      if ((error as any)?.status !== 401) {
+        // Only clear token if it's a 401 auth error
+        api.clearToken();
+      }
     } finally {
       setIsLoading(false);
     }
@@ -76,7 +112,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         setUser(response.data.user);
         
-        // ✅ Dispatch event for wishlist to sync
+        // Store user info in localStorage for persistence
+        localStorage.setItem('userName', response.data.user.name);
+        localStorage.setItem('userEmail', response.data.user.email);
+        if (response.data.user.phone) localStorage.setItem('userPhone', response.data.user.phone);
+        localStorage.setItem('userId', response.data.user._id);
+        
+        // Dispatch event for wishlist to sync
         window.dispatchEvent(new CustomEvent('userLoggedIn'));
         
         toast.success('Login successful!', {
@@ -109,7 +151,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (response.success && response.data) {
         setUser(response.data.user);
         
-        // ✅ Dispatch event for wishlist to sync
+        // Store user info in localStorage
+        localStorage.setItem('userName', response.data.user.name);
+        localStorage.setItem('userEmail', response.data.user.email);
+        if (response.data.user.phone) localStorage.setItem('userPhone', response.data.user.phone);
+        localStorage.setItem('userId', response.data.user._id);
+        
+        // Dispatch event for wishlist to sync
         window.dispatchEvent(new CustomEvent('userLoggedIn'));
         
         toast.success('Registration successful!', {
@@ -133,7 +181,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await api.logout();
       setUser(null);
       
-      // ✅ Dispatch event for wishlist to clear
+      // Clear localStorage
+      localStorage.removeItem('userName');
+      localStorage.removeItem('userEmail');
+      localStorage.removeItem('userPhone');
+      localStorage.removeItem('userId');
+      
+      // Dispatch event for wishlist to clear
       window.dispatchEvent(new CustomEvent('userLoggedOut'));
       
       toast.success('Logged out successfully');
@@ -161,6 +215,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       register,
       logout,
       updateUser,
+      refreshSession,
     }}>
       {children}
     </AuthContext.Provider>
