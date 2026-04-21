@@ -2,7 +2,7 @@
 // src/pages/Wishlist.tsx
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, ArrowLeft, Loader2, Bell, Mail } from 'lucide-react';
+import { Heart, ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useWishlist } from '@/contexts/WishlistContext';
@@ -12,14 +12,12 @@ import { toast } from 'sonner';
 import { transformPGData, TransformedPG } from '@/lib/utils/pgTransformer';
 import { api } from '@/services/api';
 
-
 const Wishlist = () => {
   const { wishlist, toggleWishlist, clearWishlist } = useWishlist();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [wishlistPGs, setWishlistPGs] = useState<TransformedPG[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sendingReminder, setSendingReminder] = useState(false);
 
   useEffect(() => {
     if (wishlist.length > 0) {
@@ -35,23 +33,19 @@ const Wishlist = () => {
       setLoading(true);
       setError(null);
       
-      // Check if user is authenticated for real data
       if (!isAuthenticated) {
-        // Show demo data if not authenticated
         const mockPGs = generateMockPGs(wishlist);
         setWishlistPGs(mockPGs);
         setLoading(false);
         return;
       }
       
-      // ✅ Better way: Use getWishlist API to fetch all at once
       try {
         const response = await api.getWishlist();
         if (response.success && response.data && response.data.length > 0) {
           const transformedPGs = response.data.map((pg: any) => transformPGData(pg));
           setWishlistPGs(transformedPGs);
         } else if (wishlist.length > 0) {
-          // Fallback to individual fetches
           const fetchPromises = wishlist.map(async (id) => {
             try {
               const result = await api.getPGById(id);
@@ -91,45 +85,6 @@ const Wishlist = () => {
     }
   };
 
-  // ✅ Send wishlist reminder email using dedicated API method
-  const sendReminder = async () => {
-    if (!isAuthenticated) {
-      toast.error('Please login to send reminder', {
-        description: 'You need to be logged in to receive email reminders',
-      });
-      return;
-    }
-
-    if (wishlistPGs.length === 0) {
-      toast.error('No items in wishlist', {
-        description: 'Add some properties to your wishlist first',
-      });
-      return;
-    }
-
-    try {
-      setSendingReminder(true);
-      // ✅ Use dedicated method
-      const response = await api.sendWishlistReminder();
-      
-      if (response.success) {
-        toast.success('Reminder sent!', {
-          description: `Check your email at ${user?.email} for wishlist reminder`,
-        });
-      } else {
-        throw new Error(response.message || 'Failed to send reminder');
-      }
-    } catch (error: any) {
-      console.error('Send reminder error:', error);
-      toast.error('Failed to send reminder', {
-        description: error.message || 'Please try again later',
-      });
-    } finally {
-      setSendingReminder(false);
-    }
-  };
-
-  // Helper function to generate mock PG data
   const generateMockPGs = (ids: string[]): TransformedPG[] => {
     return ids.map((id, index) => ({
       _id: id,
@@ -166,7 +121,6 @@ const Wishlist = () => {
     });
   };
 
-  // Calculate stats
   const totalValue = wishlistPGs.reduce((sum, pg) => sum + (pg.price || 0), 0);
   const avgRating = wishlistPGs.length > 0 
     ? (wishlistPGs.reduce((sum, pg) => sum + (pg.rating || 0), 0) / wishlistPGs.length).toFixed(1)
@@ -228,23 +182,6 @@ const Wishlist = () => {
           </div>
           
           <div className="flex gap-2">
-            {/* Send Reminder Button */}
-            {isAuthenticated && wishlistPGs.length > 0 && (
-              <Button 
-                onClick={sendReminder} 
-                variant="outline" 
-                className="gap-2"
-                disabled={sendingReminder}
-              >
-                {sendingReminder ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Mail className="h-4 w-4" />
-                )}
-                {sendingReminder ? 'Sending...' : 'Send Reminder'}
-              </Button>
-            )}
-            
             <Link to="/pg">
               <Button variant="outline" className="gap-2">
                 <ArrowLeft className="h-4 w-4" />
@@ -327,23 +264,6 @@ const Wishlist = () => {
                 </div>
               ))}
             </div>
-
-            {/* Email Info Banner */}
-            {isAuthenticated && wishlistPGs.length > 0 && (
-              <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-start gap-3">
-                  <Bell className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-blue-800">
-                      Get email reminders for your wishlist
-                    </p>
-                    <p className="text-xs text-blue-600 mt-1">
-                      Click "Send Reminder" to receive an email with all your saved properties at {user?.email}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Empty state note if some items failed to load */}
             {wishlist.length > wishlistPGs.length && (

@@ -103,6 +103,64 @@ export interface CreditBalance {
   totalUsed: number;
 }
 
+export interface AnalyticsData {
+  users: {
+    total: number;
+    active: number;
+    suspended: number;
+    newToday: number;
+    newThisWeek: number;
+    newThisMonth: number;
+    newThisYear: number;
+    dailyActive: Array<{ _id: string; count: number }>;
+    roles: Array<{ _id: string; count: number }>;
+  };
+  bookings: {
+    total: number;
+    confirmed: number;
+    pending: number;
+    cancelled: number;
+    today: number;
+    thisWeek: number;
+    thisMonth: number;
+    thisYear: number;
+  };
+  revenue: {
+    total: number;
+    monthly: Array<{ _id: string; total: number }>;
+  };
+  pgs: {
+    total: number;
+    verified: number;
+    pending: number;
+    featured: number;
+    published: number;
+    popularCities: Array<{ _id: string; count: number }>;
+    types: Array<{ _id: string; count: number }>;
+  };
+  wishlist: {
+    totalItems: number;
+    usersWithWishlist: number;
+  };
+  reviews: {
+    total: number;
+    avgRating: number;
+  };
+}
+
+export interface AuditLog {
+  _id: string;
+  action: string;
+  userId: string;
+  userName: string;
+  userRole: string;
+  ipAddress: string;
+  userAgent: string;
+  details: any;
+  status: 'success' | 'failed';
+  createdAt: string;
+}
+
 interface ApiResponse<T = any> {
   success: boolean;
   message: string;
@@ -291,11 +349,9 @@ export class ApiService {
             throw error;
           }
           
-          // ✅ FIXED: Better 401 handling - don't clear token for payment routes
           if (response.status === 401) {
             console.warn(`🔐 [AUTH] 401 Unauthorized for ${endpoint}`);
             
-            // Don't clear token for payment/recommendation/booking routes
             const isProtectedRoute = endpoint.includes('/api/payments/') || 
                                       endpoint.includes('/api/recommendations/') ||
                                       endpoint.includes('/api/bookings/');
@@ -304,7 +360,6 @@ export class ApiService {
               this.clearToken();
             }
             
-            // Dispatch event for UI to handle
             window.dispatchEvent(new Event('unauthorized'));
             
             const error: any = new Error(data.message || 'Unauthorized');
@@ -748,47 +803,85 @@ export class ApiService {
     return this.request(`/api/price-alerts/${alertId}`, { method: 'DELETE' });
   }
 
-  // ────────────────── Admin Endpoints ──────────────────
+  // ────────────────── Admin User Management Endpoints ──────────────────
 
   async getAllUsers(): Promise<ApiResponse<{ count: number; items: User[] }>> {
-    return this.request<ApiResponse<{ count: number; items: User[] }>>('/api/auth/users');
+    return this.request<ApiResponse<{ count: number; items: User[] }>>('/api/users', { method: 'GET' });
   }
 
   async getUserById(id: string): Promise<ApiResponse<User>> {
-    return this.request<ApiResponse<User>>(`/api/auth/users/${id}`);
+    return this.request<ApiResponse<User>>(`/api/users/${id}`, { method: 'GET' });
+  }
+
+  async updateUser(id: string, userData: Partial<User>): Promise<ApiResponse<User>> {
+    const response = await this.request<ApiResponse<User>>(`/api/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(userData),
+    });
+    this.clearCache();
+    return response;
   }
 
   async deleteUser(id: string): Promise<ApiResponse<{ deletedId: string }>> {
-    const response = await this.request<ApiResponse<{ deletedId: string }>>(`/api/auth/users/${id}`, { method: 'DELETE' });
-    this.cache.clearPattern(/\/api\/auth\/users/);
+    const response = await this.request<ApiResponse<{ deletedId: string }>>(`/api/users/${id}`, { method: 'DELETE' });
+    this.cache.clearPattern(/\/api\/users/);
     return response;
   }
 
   async updateUserStatus(id: string, status: string): Promise<ApiResponse<User>> {
-    const response = await this.request<ApiResponse<User>>(`/api/auth/users/${id}/status`, {
+    const response = await this.request<ApiResponse<User>>(`/api/users/${id}/status`, {
       method: 'PUT',
       body: JSON.stringify({ status }),
     });
-    this.cache.clearPattern(/\/api\/auth\/users/);
+    this.cache.clearPattern(/\/api\/users/);
     return response;
   }
 
-  // ────────────────── Notification Endpoints ──────────────────
+  // ────────────────── Admin Analytics Endpoints ──────────────────
+
+  async getDashboardStats(): Promise<ApiResponse<any>> {
+    return this.request('/api/stats/dashboard', { method: 'GET' });
+  }
+
+  async getAnalytics(): Promise<ApiResponse<AnalyticsData>> {
+    return this.request('/api/stats/analytics', { method: 'GET' });
+  }
+
+  // ────────────────── Admin Notification Endpoints ──────────────────
 
   async sendWishlistReminder(): Promise<ApiResponse<{ message: string }>> {
     return this.request('/api/notifications/wishlist-reminder', { method: 'POST' });
+  }
+
+  async sendWishlistReminderToUser(userId: string): Promise<ApiResponse<{ message: string }>> {
+    return this.request(`/api/notifications/admin/wishlist-reminder/${userId}`, { method: 'POST' });
+  }
+
+  async sendBulkWishlistReminders(): Promise<ApiResponse<{ message: string; data: any }>> {
+    return this.request('/api/notifications/admin/bulk-wishlist-reminder', { method: 'POST' });
+  }
+
+  async sendBulkOfferEmails(offerMessage?: string, discountCode?: string): Promise<ApiResponse<{ message: string }>> {
+    return this.request('/api/notifications/admin/bulk-offer', { 
+      method: 'POST', 
+      body: JSON.stringify({ offerMessage, discountCode }) 
+    });
   }
 
   async sendBookingConfirmation(bookingDetails: { pgName: string; duration: number; totalAmount: number; moveInDate: string }): Promise<ApiResponse<{ message: string }>> {
     return this.request('/api/notifications/booking-confirmation', { method: 'POST', body: JSON.stringify(bookingDetails) });
   }
 
-  async testNotification(): Promise<ApiResponse<{ message: string }>> {
-    return this.request('/api/notifications/test', { method: 'POST' });
-  }
-
   async sendOfferEmail(email: string, name: string): Promise<ApiResponse<{ message: string }>> {
     return this.request('/api/notifications/send-offer', { method: 'POST', body: JSON.stringify({ email, name }) });
+  }
+
+  async getNotificationStats(): Promise<ApiResponse<any>> {
+    return this.request('/api/notifications/admin/stats', { method: 'GET' });
+  }
+
+  async testNotification(): Promise<ApiResponse<{ message: string }>> {
+    return this.request('/api/notifications/test', { method: 'POST' });
   }
 
   // ────────────────── PG Demand & Views Endpoints ──────────────────
@@ -815,6 +908,24 @@ export class ApiService {
 
   async getBlogBySlug(slug: string): Promise<ApiResponse<any>> {
     return this.request(`/api/blogs/${slug}`, { method: 'GET' });
+  }
+
+  async createBlog(blogData: any): Promise<ApiResponse<any>> {
+    const response = await this.request('/api/blogs', { method: 'POST', body: JSON.stringify(blogData) });
+    this.clearCache();
+    return response;
+  }
+
+  async updateBlog(id: string, blogData: any): Promise<ApiResponse<any>> {
+    const response = await this.request(`/api/blogs/${id}`, { method: 'PUT', body: JSON.stringify(blogData) });
+    this.clearCache();
+    return response;
+  }
+
+  async deleteBlog(id: string): Promise<ApiResponse<any>> {
+    const response = await this.request(`/api/blogs/${id}`, { method: 'DELETE' });
+    this.clearCache();
+    return response;
   }
 
   async getFeaturedBlogs(limit: number = 3): Promise<ApiResponse<any[]>> {
