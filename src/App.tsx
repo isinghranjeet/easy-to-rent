@@ -21,8 +21,18 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
-import AdminPanel from "./pages/AdminPanel";
 import OwnerDashboard from "./pages/OwnerDashboard";
+
+// ────────────────── Admin Dashboard (New Modular Architecture) ──────────────────
+import AdminLayout from "./admin/pages/AdminLayout";
+import AdminDashboard from "./admin/pages/AdminDashboard";
+import PgManagement from "./admin/pages/PgManagement";
+import UserManagement from "./admin/pages/UserManagement";
+import BookingManagement from "./admin/pages/BookingManagement";
+import ReviewManagement from "./admin/pages/ReviewManagement";
+import AnalyticsPage from "./admin/pages/AnalyticsPage";
+import SystemHealth from "./admin/pages/SystemHealth";
+import NotificationsPage from "./admin/pages/NotificationsPage";
 
 // Missing imports - add these
 import HowItWorks from "./pages/how-it-works";
@@ -36,6 +46,9 @@ import LocationPage from "./pages/LocationPage";
 
 // Auth Callback for Google Login
 import AuthCallback from "./pages/AuthCallback";
+
+// ✅ ADD DASHBOARD IMPORT
+import Dashboard from "./pages/Dashboard";
 
 import { useAuth } from "./contexts/AuthContext";
 import { Navigate, useLocation } from "react-router-dom";
@@ -67,7 +80,7 @@ const App = () => (
       <AuthProvider>
         <WishlistProvider>
           <CompareProvider>
-            <BrowserRouter>
+            <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
               <Routes>
                 {/* ================= Public Routes (Tenant-Facing) ================= */}
                 <Route path="/" element={<RoleGate><Index /></RoleGate>} />
@@ -76,6 +89,10 @@ const App = () => (
                 <Route path="/owner/register" element={<Login />} />
                 <Route path="/pg" element={<RoleGate><PGList /></RoleGate>} />
                 <Route path="/pg/:slug" element={<RoleGate><PGDetail /></RoleGate>} />
+                
+                {/* ✅ DASHBOARD ROUTE - ADDED */}
+                <Route path="/dashboard" element={<RoleGate><Dashboard /></RoleGate>} />
+                
                 <Route path="/wishlist" element={<RoleGate><Wishlist /></RoleGate>} />
                 <Route path="/compare" element={<RoleGate><Compare /></RoleGate>} />
                 <Route path="/about" element={<RoleGate><About /></RoleGate>} />
@@ -100,8 +117,17 @@ const App = () => (
                 {/* Auth Callback Route (Google Login Redirect) */}
                 <Route path="/auth/callback" element={<AuthCallback />} />
 
-                {/* ================= Admin Routes ================= */}
-                <Route path="/admin" element={<RoleGate><AdminPanel /></RoleGate>} />
+                {/* ================= Admin Routes (New Modular Architecture) ================= */}
+                <Route path="/admin" element={<RoleGate><AdminLayout /></RoleGate>}>
+                  <Route index element={<AdminDashboard />} />
+                  <Route path="users" element={<UserManagement />} />
+                  <Route path="pgs" element={<PgManagement />} />
+                  <Route path="bookings" element={<BookingManagement />} />
+                  <Route path="reviews" element={<ReviewManagement />} />
+                  <Route path="analytics" element={<AnalyticsPage />} />
+                  <Route path="system" element={<SystemHealth />} />
+                  <Route path="notifications" element={<NotificationsPage />} />
+                </Route>
 
                 {/* ================= Owner Routes ================= */}
                 <Route path="/owner" element={<OwnerDashboard />} />

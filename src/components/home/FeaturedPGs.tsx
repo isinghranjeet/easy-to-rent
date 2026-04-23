@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, AlertCircle, Heart, Shield, Home, Wifi, Loader2 } from 'lucide-react';
+import { ArrowRight, AlertCircle, Heart, Shield, Home, Wifi, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PGCard } from '@/components/pg/PGCard';
 import { api } from '@/services/api';
@@ -44,6 +44,19 @@ const initialState = {
   family: [],
   'co-ed': [],
 };
+
+// Home Logo component for fallback
+const HomeLogo = () => (
+  <div className="flex flex-col items-center justify-center h-full w-full bg-gradient-to-br from-gray-100 to-gray-200">
+    <div className="text-center p-4">
+      <div className="w-20 h-20 mx-auto mb-3 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 flex items-center justify-center shadow-lg">
+        <Home className="h-10 w-10 text-white" />
+      </div>
+      <p className="text-gray-600 text-sm font-medium">EasyTorent</p>
+      <p className="text-gray-400 text-xs mt-1">PG Accommodation</p>
+    </div>
+  </div>
+);
 
 export function FeaturedPGs() {
   const [staysByType, setStaysByType] = useState<Record<string, PGListing[]>>(initialState);
@@ -148,13 +161,57 @@ export function FeaturedPGs() {
   const transformForCard = useCallback((stay: PGListing) => {
     const amenitiesLower = stay.amenities?.map(a => a.toLowerCase()) || [];
 
+    // Filter out fake/placeholder images - only keep real images
+    const filterRealImages = (images: string[] | undefined) => {
+      if (!images || !Array.isArray(images)) return [];
+      
+      // List of fake/placeholder patterns to exclude
+      const fakePatterns = [
+        'placeholder',
+        'default',
+        'fake',
+        'dummy',
+        'unsplash.com/photos',
+        'picsum.photos',
+        'loremflick',
+        'cloudimage',
+        'via.placeholder.com',
+        'placekitten',
+        'loremflick',
+        'dummyimage'
+      ];
+      
+      return images.filter(img => {
+        if (!img || typeof img !== 'string') return false;
+        const lowerImg = img.toLowerCase();
+        // Check if image URL contains any fake pattern
+        const isFake = fakePatterns.some(pattern => lowerImg.includes(pattern));
+        // Also filter out empty strings or very short URLs
+        if (img.trim().length < 10) return false;
+        return !isFake;
+      });
+    };
+
+    // Get real images from owner
+    const ownerImages = filterRealImages(stay.images);
+    const ownerGallery = filterRealImages(stay.gallery);
+    
+    // Combine all real images
+    let allRealImages = [...ownerImages, ...ownerGallery];
+    
+    // Remove duplicates
+    allRealImages = [...new Set(allRealImages)];
+    
+    // If no real images, use empty array (will show home logo in PGCard)
+    const finalImages = allRealImages.length > 0 ? allRealImages : [];
+
     return {
       id: stay._id,
       name: stay.name,
       slug: stay.slug || stay._id,
       description: stay.description || 'Comfortable accommodation with all amenities',
       price: stay.price,
-      images: stay.images || [],
+      images: finalImages, // Only real images or empty array
       gallery: stay.gallery || [],
       city: stay.city,
       locality: stay.locality || stay.city,
@@ -165,7 +222,7 @@ export function FeaturedPGs() {
       ownerName: stay.ownerName,
       ownerPhone: stay.ownerPhone,
       featured: stay.featured || false,
-      verified: stay.verified || false,
+      verified: false, // Hide verified badge
       wifi: stay.wifi ?? amenitiesLower.some(a => a.includes('wifi') || a.includes('internet')),
       meals: stay.meals ?? amenitiesLower.some(a => a.includes('meal') || a.includes('food')),
       ac: stay.ac ?? amenitiesLower.some(a => a.includes('ac') || a.includes('air conditioning')),
@@ -366,6 +423,3 @@ export function FeaturedPGs() {
     </section>
   );
 }
-
-// Add RefreshCw import if not present
-import { RefreshCw } from 'lucide-react';

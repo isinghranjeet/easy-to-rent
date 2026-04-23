@@ -26,11 +26,9 @@ export function Hero() {
     { name: string; slug: string }[]
   >([]);
 
-  // 🎯 Capitalize helper
   const capitalize = (str: string) =>
     str.charAt(0).toUpperCase() + str.slice(1);
 
-  // 🎯 College mapping
   const collegeMap = useMemo(
     () => ({
       "Room near Chandigarh University": "Kharar",
@@ -43,12 +41,10 @@ export function Hero() {
     []
   );
 
-  // 📡 Fetch Locations
   const fetchLocations = useCallback(async () => {
     try {
       setLoadingLocations(true);
 
-      // Cache check
       const cached = localStorage.getItem("pg_locations_v2");
       if (cached) {
         const parsed = JSON.parse(cached);
@@ -69,7 +65,6 @@ export function Hero() {
           slug: loc.slug,
         }));
       } else {
-        // fallback
         const pgResult = await api.request<any>("/api/pg?limit=100");
         const listings =
           pgResult?.data?.items ||
@@ -90,7 +85,6 @@ export function Hero() {
         }));
       }
 
-      // cache save
       localStorage.setItem(
         "pg_locations_v2",
         JSON.stringify({
@@ -103,7 +97,6 @@ export function Hero() {
     } catch (error) {
       console.error("Failed to fetch locations:", error);
 
-      // fallback static
       setLocations([
         { name: "Chandigarh", slug: "chandigarh" },
         { name: "Mohali", slug: "mohali" },
@@ -119,7 +112,6 @@ export function Hero() {
     fetchLocations();
   }, [fetchLocations]);
 
-  // 🔍 Search handler
   const handleSearch = useCallback(() => {
     const params = new URLSearchParams();
 
@@ -130,7 +122,6 @@ export function Hero() {
     navigate(`/pg?${params.toString()}`);
   }, [searchQuery, selectedLocation, selectedType, navigate]);
 
-  // 🎯 College select
   const handleCollegeSelect = useCallback(
     (college: string) => {
       const location = collegeMap[college];
@@ -142,7 +133,6 @@ export function Hero() {
     [collegeMap, navigate]
   );
 
-  // 🎯 Location select
   const handleLocationSelect = useCallback(
     (locationName: string) => {
       setSelectedLocation(locationName);
@@ -153,38 +143,43 @@ export function Hero() {
 
   return (
     <section className="relative w-full min-h-[60vh] flex items-center overflow-hidden">
-      {/* Background */}
       <div className="absolute inset-0 hero-gradient opacity-95" />
 
       <div className="container mx-auto px-4 relative z-10">
         <div className="max-w-3xl mx-auto text-center">
 
-          {/* Heading */}
+          {/* 🔥 DESI HEADER */}
           <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4">
-            Find Affordable PG in Chandigarh, Noida & Faridabad
+            Apna Thikana Yahin Milega 🏠
           </h1>
 
-          <p className="text-white text-sm md:text-base mb-6">
-            Verified PG near top colleges with food, WiFi and security.
+          <p className="text-white text-sm md:text-base mb-2">
+            Room ki tension khatam 😎 – rehne ka full jugaad set hai yahan!
+          </p>
+
+          <p className="text-white text-xs md:text-sm opacity-90 mb-6">
+            Sasta • Safe • Seedha shift • Full comfort ✔️
+          </p>
+
+          {/* Hidden SEO */}
+          <p className="hidden">
+            Affordable rental rooms with food, WiFi and security
           </p>
 
           {/* Search Box */}
           <div className="bg-white rounded-2xl p-4 md:p-6 shadow-xl">
-
             <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
 
-              {/* Search */}
               <div className="md:col-span-2 relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                 <Input
-                  placeholder="Search PG name or description..."
+                  placeholder="Search by area, name..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10 h-11"
                 />
               </div>
 
-              {/* Location */}
               <Select
                 value={selectedLocation || "all"}
                 onValueChange={(val) =>
@@ -212,7 +207,6 @@ export function Hero() {
                 </SelectContent>
               </Select>
 
-              {/* Type */}
               <Select
                 value={selectedType || "all"}
                 onValueChange={(val) =>
@@ -225,14 +219,13 @@ export function Hero() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="boys">Boys PG</SelectItem>
-                  <SelectItem value="girls">Girls PG</SelectItem>
-                  <SelectItem value="co-ed">Co-ed PG</SelectItem>
-                  <SelectItem value="family">Family PG</SelectItem>
+                  <SelectItem value="boys">Boys</SelectItem>
+                  <SelectItem value="girls">Girls</SelectItem>
+                  <SelectItem value="co-ed">Co-ed</SelectItem>
+                  <SelectItem value="family">Family</SelectItem>
                 </SelectContent>
               </Select>
 
-              {/* Colleges */}
               <Select onValueChange={handleCollegeSelect}>
                 <SelectTrigger className="h-11">
                   <MapPin className="h-4 w-4 mr-2 text-gray-500" />
@@ -249,7 +242,6 @@ export function Hero() {
 
             </div>
 
-            {/* Search Button */}
             <div className="mt-3">
               <Button
                 onClick={handleSearch}
@@ -259,7 +251,6 @@ export function Hero() {
                 Search
               </Button>
             </div>
-
           </div>
 
         </div>
@@ -274,7 +265,6 @@ export function Hero() {
           />
         </svg>
       </div>
-
     </section>
   );
 }

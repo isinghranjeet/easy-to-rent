@@ -116,47 +116,42 @@ export function Navbar() {
             <div className="hidden lg:flex items-center gap-3">
               {user?.role !== 'owner' && (
                 <>
-                  {/* Compare Button - Desktop with Orange Theme */}
-                  <Button
-                    asChild
-                    variant="outline"
-                    className="relative flex items-center gap-2 border-2 border-gray-200 hover:border-orange-400 hover:bg-orange-50 transition-all duration-300 group"
+                  {/* ✅ FIXED: Compare Button - No nested button */}
+                  <Link
+                    to="/compare"
+                    className="relative flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-gray-200 hover:border-orange-400 hover:bg-orange-50 transition-all duration-300 group"
                   >
-                    <Link to="/compare">
-                      <Scale className="h-4 w-4 text-gray-600 group-hover:text-orange-500 group-hover:scale-110 transition-all duration-300" />
-                      <span className="group-hover:text-orange-600">Compare</span>
-                      {compareList.length > 0 && (
-                        <span className="absolute -top-2 -right-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white px-2 py-0.5 rounded-full text-xs font-bold animate-pulse">
-                          {compareList.length}
-                        </span>
-                      )}
-                    </Link>
-                  </Button>
+                    <Scale className="h-4 w-4 text-gray-600 group-hover:text-orange-500 group-hover:scale-110 transition-all duration-300" />
+                    <span className="text-sm font-medium text-gray-700 group-hover:text-orange-600">Compare</span>
+                    {compareList.length > 0 && (
+                      <span className="absolute -top-2 -right-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white px-2 py-0.5 rounded-full text-xs font-bold animate-pulse">
+                        {compareList.length}
+                      </span>
+                    )}
+                  </Link>
 
-                  {/* Wishlist Button - Desktop */}
-                  <Button
-                    asChild
-                    variant="outline"
-                    className="relative flex items-center gap-2 border-2 border-gray-200 hover:border-orange-400 hover:bg-orange-50 transition-all duration-300 group"
+                  {/* ✅ FIXED: Wishlist Button - No nested button */}
+                  <Link
+                    to="/wishlist"
+                    className="relative flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-gray-200 hover:border-orange-400 hover:bg-orange-50 transition-all duration-300 group"
                   >
-                    <Link to="/wishlist">
-                      <Heart className="h-4 w-4 text-gray-600 group-hover:text-orange-500 group-hover:scale-110 transition-all duration-300" />
-                      <span className="group-hover:text-orange-600">Wishlist</span>
-                      {wishlist.length > 0 && (
-                        <span className="absolute -top-2 -right-2 bg-gradient-to-r from-orange-500 to-red-500 text-white px-2 py-0.5 rounded-full text-xs font-bold animate-pulse">
-                          {wishlist.length}
-                        </span>
-                      )}
-                    </Link>
-                  </Button>
+                    <Heart className="h-4 w-4 text-gray-600 group-hover:text-orange-500 group-hover:scale-110 transition-all duration-300" />
+                    <span className="text-sm font-medium text-gray-700 group-hover:text-orange-600">Wishlist</span>
+                    {wishlist.length > 0 && (
+                      <span className="absolute -top-2 -right-2 bg-gradient-to-r from-orange-500 to-red-500 text-white px-2 py-0.5 rounded-full text-xs font-bold animate-pulse">
+                        {wishlist.length}
+                      </span>
+                    )}
+                  </Link>
 
-                  {/* Search Button - Desktop */}
-                  <Button asChild className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-md shadow-orange-200 hover:shadow-lg transform hover:scale-105 transition-all duration-300">
-                    <Link to="/pg">
-                      <Search className="h-4 w-4" />
-                      Search PG
-                    </Link>
-                  </Button>
+                  {/* ✅ FIXED: Search Button - No nested button */}
+                  <Link
+                    to="/pg"
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-md shadow-orange-200 hover:shadow-lg transform hover:scale-105 transition-all duration-300"
+                  >
+                    <Search className="h-4 w-4" />
+                    <span className="text-sm font-medium">Search PG</span>
+                  </Link>
                 </>
               )}
 
@@ -231,12 +226,9 @@ export function Navbar() {
                 </div>
               ) : (
                 <div className="flex items-center gap-3">
-                  {/* IMPROVED REGISTER PROPERTY BUTTON - DESKTOP */}
+                  {/* Register Property Button - Desktop */}
                   <Link to="/owner/register">
-                    <Button 
-                      variant="outline" 
-                      className="group relative overflow-hidden px-5 py-2.5 border-2 border-orange-500 bg-white hover:bg-orange-50 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg"
-                    >
+                    <div className="group relative overflow-hidden px-5 py-2.5 rounded-xl border-2 border-orange-500 bg-white hover:bg-orange-50 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg">
                       <div className="flex items-center gap-2">
                         <Plus className="h-4 w-4 text-orange-500 group-hover:text-orange-600 transition-colors" />
                         <span className="font-semibold text-gray-800 group-hover:text-orange-700">
@@ -246,16 +238,15 @@ export function Navbar() {
                           Free
                         </span>
                       </div>
-                      {/* Animated underline effect */}
                       <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-orange-500 to-orange-600 group-hover:w-full transition-all duration-300"></span>
-                    </Button>
+                    </div>
                   </Link>
                   
                   <Link to="/login">
-                    <Button className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-md shadow-orange-200 transform hover:scale-105 transition-all duration-300">
+                    <div className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-md shadow-orange-200 transform hover:scale-105 transition-all duration-300">
                       <LogIn className="h-4 w-4" />
-                      Login
-                    </Button>
+                      <span className="text-sm font-medium">Login</span>
+                    </div>
                   </Link>
                 </div>
               )}
@@ -265,36 +256,36 @@ export function Navbar() {
             <div className="flex lg:hidden items-center gap-1 sm:gap-2">
               {user?.role !== 'owner' && (
                 <>
-                  {/* Compare Icon - Mobile/Tablet with Orange Theme */}
-                  <Button asChild variant="ghost" size="icon" className="relative h-9 w-9 sm:h-10 sm:w-10 rounded-full hover:bg-orange-50 p-1.5 sm:p-2">
-                    <Link to="/compare">
+                  {/* Compare Icon - Mobile/Tablet */}
+                  <Link to="/compare" className="relative">
+                    <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-full hover:bg-orange-50 flex items-center justify-center p-1.5 sm:p-2">
                       <Scale className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600" />
                       {compareList.length > 0 && (
                         <span className="absolute -top-1 -right-1 bg-gradient-to-r from-orange-500 to-orange-600 text-white w-4 h-4 sm:w-5 sm:h-5 rounded-full text-xs flex items-center justify-center">
                           {compareList.length}
                         </span>
                       )}
-                    </Link>
-                  </Button>
+                    </div>
+                  </Link>
 
                   {/* Wishlist Icon - Mobile/Tablet */}
-                  <Button asChild variant="ghost" size="icon" className="relative h-9 w-9 sm:h-10 sm:w-10 rounded-full hover:bg-orange-50 p-1.5 sm:p-2">
-                    <Link to="/wishlist">
+                  <Link to="/wishlist" className="relative">
+                    <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-full hover:bg-orange-50 flex items-center justify-center p-1.5 sm:p-2">
                       <Heart className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600" />
                       {wishlist.length > 0 && (
                         <span className="absolute -top-1 -right-1 bg-gradient-to-r from-orange-500 to-red-500 text-white w-4 h-4 sm:w-5 sm:h-5 rounded-full text-xs flex items-center justify-center">
                           {wishlist.length}
                         </span>
                       )}
-                    </Link>
-                  </Button>
+                    </div>
+                  </Link>
 
                   {/* Search Icon - Mobile/Tablet */}
-                  <Button asChild variant="ghost" size="icon" className="h-9 w-9 sm:h-10 sm:w-10 rounded-full hover:bg-orange-50 p-1.5 sm:p-2">
-                    <Link to="/pg">
+                  <Link to="/pg">
+                    <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-full hover:bg-orange-50 flex items-center justify-center p-1.5 sm:p-2">
                       <Search className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600" />
-                    </Link>
-                  </Button>
+                    </div>
+                  </Link>
                 </>
               )}
 
@@ -310,9 +301,9 @@ export function Navbar() {
                 </button>
               ) : (
                 <Link to="/login" className="p-1.5 sm:p-2">
-                  <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-10 sm:w-10 rounded-full hover:bg-orange-50">
+                  <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-full hover:bg-orange-50 flex items-center justify-center">
                     <LogIn className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600" />
-                  </Button>
+                  </div>
                 </Link>
               )}
 
@@ -321,20 +312,20 @@ export function Navbar() {
                 onClick={() => setIsOpen(!isOpen)}
                 className="p-1.5 sm:p-2 ml-1"
               >
-                <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-10 sm:w-10 rounded-full bg-gray-100 hover:bg-orange-100">
+                <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-full bg-gray-100 hover:bg-orange-100 flex items-center justify-center">
                   {isOpen ? (
                     <X className="h-4 w-4 sm:h-5 sm:w-5 text-gray-700" />
                   ) : (
                     <Menu className="h-4 w-4 sm:h-5 sm:w-5 text-gray-700" />
                   )}
-                </Button>
+                </div>
               </button>
             </div>
           </div>
         </div>
       </nav>
 
-      {/* Mobile Menu Slide-out */}
+      {/* Mobile Menu Slide-out (Rest remains same) */}
       <div
         className={`fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity duration-300 ${
           isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
@@ -405,7 +396,6 @@ export function Navbar() {
               {user?.role !== 'owner' && (
                 <>
                   <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                    {/* Compare Button - Mobile Menu with Orange Theme */}
                     <Link
                       to="/compare"
                       onClick={() => setIsOpen(false)}
@@ -420,7 +410,6 @@ export function Navbar() {
                       )}
                     </Link>
 
-                    {/* Wishlist Button - Mobile Menu */}
                     <Link
                       to="/wishlist"
                       onClick={() => setIsOpen(false)}
@@ -436,16 +425,14 @@ export function Navbar() {
                     </Link>
                   </div>
 
-                  {/* Search Button - Mobile Menu */}
-                  <Button asChild className="flex items-center justify-center gap-2 p-3 mt-2 sm:mt-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all duration-300 font-medium shadow-lg shadow-orange-200">
-                    <Link
-                      to="/pg"
-                      onClick={() => setIsOpen(false)}
-                    >
-                      <Search className="h-4 w-4 sm:h-5 sm:w-5" />
-                      <span className="text-sm sm:text-base">Search PG</span>
-                    </Link>
-                  </Button>
+                  <Link
+                    to="/pg"
+                    onClick={() => setIsOpen(false)}
+                    className="flex items-center justify-center gap-2 p-3 mt-2 sm:mt-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all duration-300 font-medium shadow-lg shadow-orange-200"
+                  >
+                    <Search className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span className="text-sm sm:text-base">Search PG</span>
+                  </Link>
                 </>
               )}
             </div>
@@ -500,29 +487,28 @@ export function Navbar() {
                   </button>
                 </>
               ) : (
-                  <div className="flex flex-col gap-2">
-                    {/* IMPROVED REGISTER PROPERTY BUTTON - MOBILE */}
-                    <Link
-                      to="/owner/register"
-                      onClick={() => setIsOpen(false)}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-orange-500 bg-white text-gray-800 rounded-xl hover:bg-orange-50 transition-all duration-300 font-medium text-sm sm:text-base group"
-                    >
-                      <Plus className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500 group-hover:text-orange-600" />
-                      <span>Register Property</span>
-                      <span className="font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-md text-xs sm:text-sm">
-                        Free
-                      </span>
-                    </Link>
-                    
-                    <Link
-                      to="/login"
-                      onClick={() => setIsOpen(false)}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all duration-300 font-medium shadow-lg shadow-orange-200 text-sm sm:text-base"
-                    >
-                      <LogIn className="h-4 w-4 sm:h-5 sm:w-5" />
-                      Login / Sign Up
-                    </Link>
-                  </div>
+                <div className="flex flex-col gap-2">
+                  <Link
+                    to="/owner/register"
+                    onClick={() => setIsOpen(false)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-orange-500 bg-white text-gray-800 rounded-xl hover:bg-orange-50 transition-all duration-300 font-medium text-sm sm:text-base group"
+                  >
+                    <Plus className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500 group-hover:text-orange-600" />
+                    <span>Register Property</span>
+                    <span className="font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-md text-xs sm:text-sm">
+                      Free
+                    </span>
+                  </Link>
+                  
+                  <Link
+                    to="/login"
+                    onClick={() => setIsOpen(false)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all duration-300 font-medium shadow-lg shadow-orange-200 text-sm sm:text-base"
+                  >
+                    <LogIn className="h-4 w-4 sm:h-5 sm:w-5" />
+                    Login / Sign Up
+                  </Link>
+                </div>
               )}
             </div>
           </div>

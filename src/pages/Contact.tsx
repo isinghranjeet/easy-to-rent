@@ -7,16 +7,17 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { 
-  MapPin, Phone, Mail, Clock, Send, MessageSquare, 
-  HelpCircle, Building, UserCheck, Shield, FileText,
-  Map, Globe, Facebook, Twitter, Instagram, Linkedin,
-  CheckCircle, AlertCircle, Loader2, Copy, Calendar,
-  X, Upload, MessageCircle, ExternalLink,
-  Navigation, Maximize2, Minimize2, MessageCircleMore,
-  Route, Navigation2, MapPinned, PhoneCall, MessageSquareText
+  MapPin, Phone, Mail, Clock, Send, MessageSquare,
+  UserCheck, Shield, FileText, Facebook, Twitter, Instagram, Linkedin,
+  CheckCircle, AlertCircle, Loader2, X, Upload, ExternalLink,
+  PhoneCall, MessageCircleMore
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { MockCAPTCHA } from '@/components/contact/MockCAPTCHA';
+import { WhatsAppButton } from '@/components/contact/WhatsAppButton';
+import { DistanceCalculator } from '@/components/contact/DistanceCalculator';
+import { LiveChatWidget } from '@/components/contact/LiveChatWidget';
 
 // Mock contact form submission function
 const mockSubmitContactForm = async (data: any) => {
@@ -45,292 +46,6 @@ const contactSchema = z.object({
 });
 
 type ContactFormData = z.infer<typeof contactSchema>;
-
-// Mock CAPTCHA component
-const MockCAPTCHA = ({ onChange }: { onChange: (token: string | null) => void }) => {
-  const [isVerified, setIsVerified] = useState(false);
-
-  const handleVerify = () => {
-    const token = `mock-captcha-token-${Date.now()}`;
-    setIsVerified(true);
-    onChange(token);
-    toast.success('Security verification completed');
-  };
-
-  const handleReset = () => {
-    setIsVerified(false);
-    onChange(null);
-  };
-
-  return (
-    <div className="border rounded-lg p-4 bg-gray-50 border-gray-200">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-orange-600 rounded flex items-center justify-center">
-            <Shield className="w-4 h-4 text-white" />
-          </div>
-          <span className="font-medium text-gray-900">Security Verification</span>
-        </div>
-        <span className="text-xs text-gray-500">Privacy • Terms</span>
-      </div>
-      <div className="border-t pt-3">
-        {!isVerified ? (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-6 h-6 border-2 border-gray-400 rounded-sm"></div>
-              <span className="text-sm text-gray-700">Confirm you are not a robot</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-5 h-5 bg-orange-600 rounded"></div>
-              <div className="w-5 h-5 bg-red-600 rounded"></div>
-              <div className="w-5 h-5 bg-yellow-500 rounded"></div>
-              <div className="w-5 h-5 bg-green-600 rounded"></div>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <CheckCircle className="h-5 w-5 text-green-600" />
-              <span className="text-sm text-gray-900">Verified</span>
-            </div>
-            <Button variant="ghost" size="sm" onClick={handleReset} className="text-gray-600">
-              Reset
-            </Button>
-          </div>
-        )}
-        {!isVerified && (
-          <Button
-            variant="outline"
-            className="w-full mt-3 border-gray-300 hover:border-orange-400 hover:text-orange-600"
-            onClick={handleVerify}
-          >
-            Verify Security Check
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// WhatsApp Button Component
-const WhatsAppButton = () => {
-  const whatsappNumber = '9315058665';
-  const defaultMessage = encodeURIComponent('Hello, I need assistance with PG accommodation near Chandigarh University.');
-  
-  return (
-    <a
-      href={`https://wa.me/${whatsappNumber}?text=${defaultMessage}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="fixed bottom-6 right-6 w-14 h-14 bg-[#25D366] rounded-full shadow-lg flex items-center justify-center hover:scale-105 transition-transform z-40"
-      title="Contact via WhatsApp"
-    >
-      <svg className="h-7 w-7 text-white" fill="currentColor" viewBox="0 0 24 24">
-        <path d="M20.52 3.49C18.18 1.13 15.19 0 12 0A12 12 0 0 0 0 12c0 2.07.55 4.06 1.59 5.77L0 24l6.33-1.55A12 12 0 0 0 12 24c6.63 0 12-5.37 12-12 0-3.19-1.25-6.19-3.48-8.51zM12 22c-1.92 0-3.78-.55-5.38-1.58l-.39-.24-3.95 1 1.06-3.85-.25-.39A10 10 0 0 1 2 12C2 6.48 6.48 2 12 2s10 4.48 10 10-4.48 10-10 10zm5.53-14.2c-.15-.25-.54-.27-.77-.15-2.1 1.04-4.87 1.3-6.85.48-2.02-.83-3.69-2.96-3.8-3.1-.1-.14-.3-.2-.5-.2-.2 0-.4.1-.5.2-.1.14-.8 1.1-.8 2.64 0 1.54 1.1 3.06 1.25 3.27.15.2 2.16 3.24 5.26 4.5 3.1 1.26 3.1.84 3.65.78.56-.07 1.8-.73 2.05-1.44.25-.7.25-1.3.18-1.44-.08-.14-.23-.22-.38-.27z"/>
-      </svg>
-    </a>
-  );
-};
-
-// Distance Calculator Component
-const DistanceCalculator = () => {
-  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
-  const [distance, setDistance] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isMapExpanded, setIsMapExpanded] = useState(false);
-
-  // Chandigarh University Coordinates
-  const cuCoords = { lat: 30.7067, lng: 76.7180 };
-
-  const calculateDistance = () => {
-    if (!userLocation) {
-      getCurrentLocation();
-      return;
-    }
-
-    setIsLoading(true);
-    
-    // Simulate API call delay
-    setTimeout(() => {
-      const R = 6371; // Earth's radius in km
-      const dLat = (cuCoords.lat - userLocation.lat) * Math.PI / 180;
-      const dLon = (cuCoords.lng - userLocation.lng) * Math.PI / 180;
-      const a = 
-        Math.sin(dLat/2) * Math.sin(dLat/2) +
-        Math.cos(userLocation.lat * Math.PI / 180) * Math.cos(cuCoords.lat * Math.PI / 180) * 
-        Math.sin(dLon/2) * Math.sin(dLon/2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      const calculatedDistance = R * c;
-      
-      setDistance(calculatedDistance.toFixed(1));
-      setIsLoading(false);
-      
-      toast.success('Distance calculated successfully');
-    }, 1500);
-  };
-
-  const getCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      toast.error('Geolocation is not supported by your browser');
-      return;
-    }
-
-    setIsLoading(true);
-    
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        setUserLocation({ lat: latitude, lng: longitude });
-        toast.success('Location detected successfully');
-        calculateDistance();
-      },
-      (error) => {
-        console.error('Error getting location:', error);
-        setIsLoading(false);
-        toast.error('Unable to retrieve your location. Please enable location services.');
-      }
-    );
-  };
-
-  const openGoogleMaps = () => {
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${cuCoords.lat},${cuCoords.lng}`;
-    window.open(url, '_blank');
-  };
-
-  return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center">
-            <Route className="h-5 w-5 text-orange-600" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-gray-900">Distance from Chandigarh University</h3>
-            <p className="text-sm text-sky-600">Calculate your current distance</p>
-          </div>
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setIsMapExpanded(!isMapExpanded)}
-          className="text-gray-600 hover:text-orange-600"
-        >
-          {isMapExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-        </Button>
-      </div>
-
-      <div className={`transition-all duration-300 ${isMapExpanded ? 'h-64' : 'h-48'} mb-4`}>
-        <div className="h-full bg-gradient-to-br from-orange-50 to-amber-50 rounded-lg overflow-hidden border border-gray-200 relative">
-          {/* Map Placeholder */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
-            <MapPinned className="h-12 w-12 text-orange-600/30 mb-4" />
-            <div className="text-center mb-4">
-              <p className="font-medium text-gray-900 mb-1">Chandigarh University</p>
-              <p className="text-sm text-sky-600">Gharuan, Mohali, Punjab</p>
-            </div>
-            
-            {userLocation && (
-              <div className="flex items-center gap-2 text-sm text-sky-600 bg-white/80 px-3 py-2 rounded-lg">
-                <Navigation2 className="h-4 w-4 text-green-600" />
-                <span>Your location detected</span>
-              </div>
-            )}
-          </div>
-          
-          {/* Distance Indicator */}
-          {distance && (
-            <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg px-4 py-3 shadow-sm border">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-orange-600 rounded-full flex items-center justify-center">
-                  <Navigation className="h-4 w-4 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm text-sky-600">Distance to CU</p>
-                  <p className="text-lg font-semibold text-gray-900">{distance} km</p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        {distance ? (
-          <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-            <div className="flex items-start gap-3">
-              <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="font-medium text-gray-900">Distance Calculated</p>
-                <p className="text-sm text-sky-600 mt-1">
-                  You are approximately {distance} km from Chandigarh University.
-                  {parseFloat(distance) < 5 && " You're in the immediate vicinity."}
-                </p>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
-            <div className="flex items-start gap-3">
-              <MapPin className="h-5 w-5 text-orange-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="font-medium text-gray-900">Location Detection Required</p>
-                <p className="text-sm text-sky-600 mt-1">
-                  Enable location services to calculate distance and find nearby PG accommodations.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="flex flex-wrap gap-3">
-          <Button
-            onClick={calculateDistance}
-            disabled={isLoading}
-            className="flex-1 min-w-[140px] gap-2 bg-orange-600 hover:bg-orange-700"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Calculating...
-              </>
-            ) : (
-              <>
-                <Navigation2 className="h-4 w-4" />
-                {distance ? 'Recalculate' : 'Calculate Distance'}
-              </>
-            )}
-          </Button>
-          
-          <Button
-            variant="outline"
-            onClick={openGoogleMaps}
-            className="flex-1 min-w-[140px] gap-2 border-orange-300 hover:border-orange-400 hover:bg-orange-50 text-gray-700 hover:text-orange-600"
-          >
-            <Map className="h-4 w-4" />
-            View on Maps
-          </Button>
-        </div>
-
-        <div className="pt-4 border-t">
-          <p className="text-sm text-sky-600 mb-3">Nearby PG Accommodations</p>
-          <div className="flex flex-wrap gap-2">
-            {['Within 1km', '1-3km', '3-5km', '5-10km'].map((range) => (
-              <Button
-                key={range}
-                variant="ghost"
-                size="sm"
-                className="text-xs text-sky-600 hover:bg-orange-50 hover:text-orange-600"
-                onClick={() => toast.info(`Searching for PGs ${range} from CU`)}
-              >
-                {range}
-              </Button>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const Contact = () => {
   const [formData, setFormData] = useState<ContactFormData>({
@@ -696,70 +411,6 @@ const Contact = () => {
       actionText: 'Schedule Now',
     },
   ];
-
-  const LiveChatWidget = () => (
-    <div className="fixed bottom-24 right-6 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
-      <div className="p-4 border-b bg-gray-50 rounded-t-lg">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-orange-600 rounded-full flex items-center justify-center">
-              <MessageSquareText className="h-4 w-4 text-white" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">Support Assistant</h3>
-              <p className="text-xs text-sky-600 flex items-center gap-1">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                Online - Quick response
-              </p>
-            </div>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsChatOpen(false)}
-            className="h-8 w-8 p-0 text-gray-500 hover:text-orange-600"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-      <div className="h-96 overflow-y-auto p-4 space-y-4">
-        {chatHistory.map((msg) => (
-          <div
-            key={msg.id}
-            className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div className={`max-w-[80%] rounded-lg p-3 ${
-              msg.sender === 'user'
-                ? 'bg-orange-600 text-white'
-                : 'bg-gray-100 text-gray-900'
-            }`}>
-              <p className="text-sm">{msg.message}</p>
-              <p className="text-xs opacity-70 mt-1">{msg.time}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="p-4 border-t">
-        <div className="flex gap-2">
-          <Input
-            value={chatMessage}
-            onChange={(e) => setChatMessage(e.target.value)}
-            placeholder="Type your message here..."
-            onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()}
-            className="flex-1 focus:border-orange-400 focus:ring-orange-400"
-          />
-          <Button 
-            onClick={sendChatMessage}
-            disabled={!chatMessage.trim()}
-            className="bg-orange-600 hover:bg-orange-700"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 via-white to-blue-50">
@@ -1245,7 +896,14 @@ const Contact = () => {
       </button>
 
       {/* Live Chat Widget */}
-      {isChatOpen && <LiveChatWidget />}
+      <LiveChatWidget
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        chatMessage={chatMessage}
+        onChatMessageChange={setChatMessage}
+        chatHistory={chatHistory}
+        onSendMessage={sendChatMessage}
+      />
 
       {/* Success Modal */}
       {showSuccessModal && (

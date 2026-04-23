@@ -73,7 +73,7 @@ export interface Booking {
   totalAmount: number;
   discountApplied: number;
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'refunded';
-  paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
+  paymentStatus: 'pending' | 'processing' | 'paid' | 'failed' | 'refunded' | 'partially_refunded';
   guestDetails: {
     name: string;
     phone: string;
@@ -83,6 +83,9 @@ export interface Booking {
   };
   specialRequests?: string;
   reviewed: boolean;
+  paymentId?: string;
+  paymentProvider?: string;
+  paymentCompletedAt?: string;
   createdAt: string;
 }
 
@@ -379,6 +382,14 @@ export class ApiService {
 
         return data as T;
       } catch (error: any) {
+        if (error instanceof TypeError && error.message === 'Failed to fetch') {
+          const networkError: any = new Error(
+            `Unable to reach API at ${this.baseURL}. Ensure backend is running and VITE_API_URL is correct.`
+          );
+          networkError.status = 0;
+          console.error(`❌ [API_FAILURE] ${method} ${url}:`, networkError.message);
+          throw networkError;
+        }
         console.error(`❌ [API_FAILURE] ${method} ${url}:`, error.message);
         throw error;
       }
@@ -485,6 +496,40 @@ export class ApiService {
   async logout(): Promise<void> {
     this.clearToken();
     this.clearCache();
+  }
+
+  // ────────────────── ✅ NEW: Payment Endpoints ──────────────────
+
+  async createPaymentOrder(bookingId: string, amount: number): Promise<ApiResponse<{ 
+    orderId: string; 
+    amount: number; 
+    currency: string; 
+    keyId: string 
+  }>> {
+    return this.request('/api/payments/create-order', {
+      method: 'POST',
+      body: JSON.stringify({ bookingId, amount })
+    });
+  }
+
+  async verifyPayment(data: { 
+    bookingId: string; 
+    razorpay_order_id: string; 
+    razorpay_payment_id: string; 
+    razorpay_signature: string 
+  }): Promise<ApiResponse<{ booking: Booking }>> {
+    return this.request('/api/payments/verify', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async getPaymentStatus(bookingId: string): Promise<ApiResponse<{ 
+    paymentStatus: string; 
+    razorpayOrderId?: string; 
+    razorpayPaymentId?: string 
+  }>> {
+    return this.request(`/api/payments/status/${bookingId}`, { method: 'GET' });
   }
 
   // ────────────────── Wishlist Endpoints ──────────────────
@@ -694,14 +739,14 @@ export class ApiService {
     totalAmount: number;
     guestDetails: { name: string; phone: string; email?: string };
     specialRequests?: string;
-  }): Promise<ApiResponse<{ bookingId: string }>> {
+  }): Promise<ApiResponse<{ bookingId: string; data: Booking }>> {
     const response = await this.request('/api/bookings', { method: 'POST', body: JSON.stringify(bookingData) });
     this.clearCache();
     return response;
   }
 
   async getUserBookings(): Promise<ApiResponse<Booking[]>> {
-    return this.request('/api/bookings/user', { method: 'GET' });
+    return this.request('/api/bookings/mybookings', { method: 'GET' });
   }
 
   async getBookingById(bookingId: string): Promise<ApiResponse<Booking>> {
@@ -709,7 +754,10 @@ export class ApiService {
   }
 
   async cancelBooking(bookingId: string, reason?: string): Promise<ApiResponse<{ refundAmount: number }>> {
-    const response = await this.request(`/api/bookings/${bookingId}`, { method: 'DELETE', body: JSON.stringify({ reason }) });
+    const response = await this.request(`/api/bookings/${bookingId}/cancel`, { 
+      method: 'PUT', 
+      body: JSON.stringify({ reason }) 
+    });
     this.clearCache();
     return response;
   }
@@ -724,8 +772,11 @@ export class ApiService {
     return this.request(`/api/reviews/pg/${pgId}`, { method: 'GET' });
   }
 
-  async submitReview(pgId: string, rating: number, comment: string): Promise<ApiResponse<{ reviewId: string }>> {
-    const response = await this.request('/api/reviews', { method: 'POST', body: JSON.stringify({ pgId, rating, comment }) });
+  async submitReview(pgId: string, rating: number, comment: string, title?: string): Promise<ApiResponse<{ reviewId: string }>> {
+    const response = await this.request('/api/reviews', { 
+      method: 'POST', 
+      body: JSON.stringify({ pgId, rating, comment, title: title || `Review for PG` }) 
+    });
     this.clearPGCache();
     return response;
   }
