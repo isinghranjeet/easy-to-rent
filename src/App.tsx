@@ -70,26 +70,40 @@ const RoleGate = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-/* ---------------- SPLASH CONTROL ---------------- */
+/* ---------------- SPLASH CONTROLLER - ONLY ONCE ---------------- */
 const SplashController = ({ children }: { children: React.ReactNode }) => {
   const [showSplash, setShowSplash] = React.useState(true);
 
   React.useEffect(() => {
-    const seen = sessionStorage.getItem("splash_seen");
+    // Check both localStorage (permanent) and sessionStorage (session)
+    const hasSeenPermanent = localStorage.getItem("splash_seen_permanent");
+    const hasSeenSession = sessionStorage.getItem("splash_seen_session");
 
-    if (seen) {
+    // If splash was shown before (in any session), skip it
+    if (hasSeenPermanent) {
       setShowSplash(false);
       return;
     }
 
+    // If splash was shown in this session (on refresh), skip it
+    if (hasSeenSession) {
+      setShowSplash(false);
+      return;
+    }
+
+    // First time ever - show splash screen
     const timer = setTimeout(() => {
       setShowSplash(false);
-      sessionStorage.setItem("splash_seen", "true");
-    }, 1500);
+      // Mark as seen in this session (prevents showing on refresh)
+      sessionStorage.setItem("splash_seen_session", "true");
+      // Mark as seen permanently (prevents showing in future sessions)
+      localStorage.setItem("splash_seen_permanent", "true");
+    }, 2800); // Splash duration
 
     return () => clearTimeout(timer);
   }, []);
 
+  // Show splash only on first visit
   if (showSplash) {
     return <SplashScreen />;
   }
@@ -97,7 +111,7 @@ const SplashController = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-/* ---------------- APP ---------------- */
+/* ---------------- MAIN APP ---------------- */
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
