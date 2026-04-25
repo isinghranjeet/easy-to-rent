@@ -153,13 +153,9 @@ export function Hero() {
             Apna Thikana Yahin Milega 🏠
           </h1>
 
-          <p className="text-white text-sm md:text-base mb-2">
-            Room ki tension khatam 😎 – rehne ka full jugaad set hai yahan!
-          </p>
+          
 
-          <p className="text-white text-xs md:text-sm opacity-90 mb-6">
-            Sasta • Safe • Seedha shift • Full comfort ✔️
-          </p>
+         
 
           {/* Hidden SEO */}
           <p className="hidden">

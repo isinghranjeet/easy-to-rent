@@ -1,7 +1,7 @@
 // frontend/src/components/home/TopRecommendations.tsx
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Sparkles, TrendingUp, Star, MapPin, Zap } from 'lucide-react';
+import { Sparkles, TrendingUp, Star, MapPin, Zap, Crown } from 'lucide-react';
 import { PGCard } from '@/components/pg/PGCard';
 import { Button } from '@/components/ui/button';
 import { api } from '@/services/api';
@@ -13,64 +13,40 @@ interface PGListing {
   name: string;
   price: number;
   city: string;
-  locality: string;
+  locality?: string;
   images: string[];
   rating: number;
-  type: string;
+  type: 'boys' | 'girls' | 'co-ed' | 'family';
   featured?: boolean;
   verified?: boolean;
 }
 
 export const TopRecommendations = () => {
-  const [recommendations, setRecommendations] = useState<PGListing[]>([]);
   const [trending, setTrending] = useState<PGListing[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'personalized' | 'trending'>('trending');
-  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
-    fetchRecommendations();
+    fetchTrendingPGs();
   }, []);
 
-  const fetchRecommendations = async () => {
+  const fetchTrendingPGs = async () => {
     try {
       setLoading(true);
       
-      // Always fetch trending PGs (no login required)
+      // Fetch trending PGs (admin recommended)
       const pgResponse = await api.getPGs({ limit: 8, sort: '-rating' });
       
       if (pgResponse.success && pgResponse.data?.items) {
         setTrending(pgResponse.data.items);
-        
-        // If user is logged in, try to get personalized recommendations
-        if (isAuthenticated) {
-          try {
-            const personalizedRes = await api.getPersonalizedRecommendations(8);
-            if (personalizedRes.success && personalizedRes.data?.recommendations) {
-              setRecommendations(personalizedRes.data.recommendations);
-            } else {
-              // Fallback to trending if personalized fails
-              setRecommendations(pgResponse.data.items);
-            }
-          } catch (error) {
-            console.log('Personalized recommendations not available, using trending');
-            setRecommendations(pgResponse.data.items);
-          }
-        } else {
-          // Not logged in, show trending in both tabs
-          setRecommendations(pgResponse.data.items);
-        }
       }
     } catch (error) {
-      console.error('Error fetching recommendations:', error);
+      console.error('Error fetching trending PGs:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const displayData = activeTab === 'personalized' ? recommendations : trending;
-
-  // Always show the section even if no data
+  // Loading state
   if (loading) {
     return (
       <section className="py-16 bg-gradient-to-b from-white to-orange-50/30">
@@ -80,7 +56,7 @@ export const TopRecommendations = () => {
               <Sparkles className="h-4 w-4 text-orange-600" />
               <span className="text-sm font-medium text-orange-600">Curated For You</span>
             </div>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Top Recommendations</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Trending</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[...Array(4)].map((_, i) => (
@@ -96,10 +72,6 @@ export const TopRecommendations = () => {
     );
   }
 
-  if (displayData.length === 0) {
-    return null;
-  }
-
   return (
     <section className="py-16 bg-gradient-to-b from-white to-orange-50/30">
       <div className="container mx-auto px-4">
@@ -107,52 +79,21 @@ export const TopRecommendations = () => {
         <div className="text-center mb-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-orange-100 rounded-full mb-4">
             <Sparkles className="h-4 w-4 text-orange-600" />
-            <span className="text-sm font-medium text-orange-600">Curated For You</span>
+            <span className="text-sm font-medium text-orange-600">Admin Recommended</span>
           </div>
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            {activeTab === 'personalized' ? 'Top Recommendations' : 'Trending Now'}
+            Trending
           </h2>
           <p className="text-gray-600 max-w-2xl mx-auto">
-            {activeTab === 'personalized' 
-              ? 'Based on your browsing history and preferences'
-              : 'Most viewed and popular properties this month'}
+            Most viewed and popular properties recommended by our team
           </p>
         </div>
 
-        {/* Tabs */}
-        <div className="flex justify-center gap-4 mb-8">
-          {isAuthenticated && (
-            <button
-              onClick={() => setActiveTab('personalized')}
-              className={cn(
-                "px-6 py-2 rounded-full font-medium transition-all",
-                activeTab === 'personalized'
-                  ? "bg-orange-600 text-white shadow-lg"
-                  : "bg-white text-gray-600 hover:bg-orange-50"
-              )}
-            >
-              For You
-            </button>
-          )}
-          <button
-            onClick={() => setActiveTab('trending')}
-            className={cn(
-              "px-6 py-2 rounded-full font-medium transition-all",
-              activeTab === 'trending'
-                ? "bg-orange-600 text-white shadow-lg"
-                : "bg-white text-gray-600 hover:bg-orange-50"
-            )}
-          >
-            <TrendingUp className="inline h-4 w-4 mr-1" />
-            Trending
-          </button>
-        </div>
-
-        {/* Recommendations Grid */}
+        {/* Trending Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {displayData.map((pg, idx) => (
+          {trending.map((pg, idx) => (
             <div key={pg._id} className="relative">
-              {activeTab === 'trending' && idx < 3 && (
+              {idx < 3 && (
                 <div className="absolute -top-2 -left-2 z-10">
                   <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg">
                     <Zap className="inline h-3 w-3 mr-1" />
@@ -165,11 +106,11 @@ export const TopRecommendations = () => {
           ))}
         </div>
 
-        {/* View All Link */}
+        {/* View All Button */}
         <div className="text-center mt-10">
           <Link to="/pg">
             <Button variant="outline" className="border-orange-300 text-orange-600 hover:bg-orange-50">
-              View All {activeTab === 'personalized' ? 'Recommendations' : 'Trending PGs'} →
+              View All Trending →
             </Button>
           </Link>
         </div>

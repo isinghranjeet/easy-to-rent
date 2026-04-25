@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { PGCard } from '@/components/pg/PGCard';
-import { AirbnbMap } from '@/components/map/AirbnbMap';
+import { AdvancedMap } from '@/components/map/AdvancedMap';
 import { PriceAlertButton } from '@/components/pg/PriceAlertButton'; // ✅ ADD THIS
 import { toast } from 'sonner';
 import {
@@ -520,7 +520,7 @@ const PGList = () => {
               <MapPin className="h-4 w-4" />
               <span>📍 Click on any marker to see PG details. Scroll to zoom in/out.</span>
             </div>
-            <AirbnbMap listings={allListings.length > 0 ? allListings : listings} loading={loading} />
+            <AdvancedMap listings={allListings.length > 0 ? allListings : listings} loading={loading} />
           </div>
         ) : (
           <>

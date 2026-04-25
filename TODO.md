@@ -1,9 +1,12 @@
-# Fix notifications.filter is not a function
+# User Login Activity Fix — TODO
 
-## Steps
-- [x] 1. Fix `useAdminNotifications.ts` — normalize `query.data` to array
-- [x] 2. Fix `useReviewManagement.ts` — normalize `pendingQuery.data` to array
-- [x] 3. Fix `useSystemHealth.ts` — normalize `logsQuery.data` to array
-- [ ] 4. Restart dev server and verify Admin Dashboard loads
+## Backend
+- [x] 1. Add `loginActivity` array field to User model (`pg-finder-backend/src/models/User.js`)
+- [x] 2. Record login activity on successful login in `authController.js` (`verifyLoginOtp` + `googleTokenLogin`)
+- [x] 3. Rewrite `getUserActivity` in `adminController.js` to return `user.loginActivity` safely
+- [x] 4. Add `GET /api/admin/users/:id/activity` route in `adminRoutes.js`
 
+## Frontend
+- [x] 5. Update `fetchUserActivity` endpoint in `adminApi.ts` to `/api/admin/users/${userId}/activity`
+- [x] 6. Add defensive checks in `UserDetailDrawer.tsx` to prevent undefined errors
 

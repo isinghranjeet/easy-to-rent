@@ -795,6 +795,26 @@ export class ApiService {
 
   // ────────────────── RECOMMENDATION ENDPOINTS WITH FALLBACK ──────────────────
 
+  async getAdminPicks(limit: number = 10): Promise<ApiResponse<{
+    adminPicks: PGListing[];
+    count: number;
+  }>> {
+    try {
+      return await this.request(`/api/recommendations/admin-picks?limit=${limit}`, { method: 'GET' });
+    } catch (error) {
+      console.log('Admin picks API failed, using fallback...');
+      const pgResponse = await this.getPGs({ limit, sort: '-rating', featured: true });
+      return {
+        success: true,
+        message: 'Using fallback admin picks',
+        data: {
+          adminPicks: pgResponse.data?.items || [],
+          count: pgResponse.data?.items?.length || 0
+        }
+      };
+    }
+  }
+
   async getPersonalizedRecommendations(limit: number = 10): Promise<ApiResponse<{
     recommendations: PGListing[];
     userPreferences: { cities: string[]; types: string[]; topAmenities: string[] };
@@ -925,6 +945,10 @@ export class ApiService {
 
   async sendOfferEmail(email: string, name: string): Promise<ApiResponse<{ message: string }>> {
     return this.request('/api/notifications/send-offer', { method: 'POST', body: JSON.stringify({ email, name }) });
+  }
+
+  async updateWishlistEmailPreference(enabled: boolean): Promise<ApiResponse<{ wishlistEmailEnabled: boolean }>> {
+    return this.request('/api/users/wishlist-email-preference', { method: 'PUT', body: JSON.stringify({ enabled }) });
   }
 
   async getNotificationStats(): Promise<ApiResponse<any>> {

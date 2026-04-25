@@ -33,6 +33,7 @@ import ReviewManagement from "./admin/pages/ReviewManagement";
 import AnalyticsPage from "./admin/pages/AnalyticsPage";
 import SystemHealth from "./admin/pages/SystemHealth";
 import NotificationsPage from "./admin/pages/NotificationsPage";
+import AdminProfile from "./admin/pages/AdminProfile";
 
 // Missing imports - add these
 import HowItWorks from "./pages/how-it-works";
@@ -127,6 +128,7 @@ const App = () => (
                   <Route path="analytics" element={<AnalyticsPage />} />
                   <Route path="system" element={<SystemHealth />} />
                   <Route path="notifications" element={<NotificationsPage />} />
+                  <Route path="profile" element={<AdminProfile />} />
                 </Route>
 
                 {/* ================= Owner Routes ================= */}

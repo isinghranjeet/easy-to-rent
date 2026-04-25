@@ -1,6 +1,3 @@
-
-
-
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useCallback, memo, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -22,7 +19,8 @@ import {
   Clock,
   Users,
   Building,
-  Home
+  Home,
+  Youtube,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -63,6 +61,7 @@ interface BackendPG {
   distance?: string;
   availableRooms?: number;
   minStay?: string;
+  virtualTour?: string;
 }
 
 interface PGCardProps {
@@ -254,7 +253,7 @@ Regards,
       'co-ed': 'Co-ed',
       'family': 'Family'
     };
-    return labels[type];
+    return labels[type || 'co-ed'];
   };
 
   const handleAuthAction = (action: 'wishlist' | 'compare', e: React.MouseEvent) => {
@@ -286,6 +285,17 @@ Regards,
 
   const handleContactClick = (type: 'call' | 'whatsapp', e: React.MouseEvent) => {
     e.stopPropagation();
+    
+    if (!isAuthenticated) {
+      toast({
+        title: "Login Required",
+        description: "Please login to contact the property owner",
+        duration: 3000,
+      });
+      setPendingAction(null);
+      setShowAuthModal(true);
+      return;
+    }
     
     toast({
       title: "EasyTorent Support",
@@ -457,17 +467,17 @@ Regards,
                   onClick={(e) => handleAuthAction('wishlist', e)}
                   className={cn(
                     "flex h-9 w-9 items-center justify-center rounded-full transition-all hover:scale-110 shadow-sm",
-                    isAuthenticated && isInWishlist(pg.id)
+                    isAuthenticated && isInWishlist(pgId)
                       ? "bg-red-500 text-white hover:bg-red-600"
                       : "bg-white/95 text-gray-700 hover:bg-white"
                   )}
                   aria-label="Add to wishlist"
                 >
-                  <Heart className={cn("h-4 w-4", isAuthenticated && isInWishlist(pg.id) && "fill-current")} />
+                  <Heart className={cn("h-4 w-4", isAuthenticated && isInWishlist(pgId) && "fill-current")} />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="left" className="text-sm">
-                <p>{isAuthenticated && isInWishlist(pg.id) ? "Remove from wishlist" : "Add to wishlist"}</p>
+                <p>{isAuthenticated && isInWishlist(pgId) ? "Remove from wishlist" : "Add to wishlist"}</p>
               </TooltipContent>
             </Tooltip>
 
@@ -477,13 +487,13 @@ Regards,
                   onClick={(e) => handleAuthAction('compare', e)}
                   className={cn(
                     "flex h-9 w-9 items-center justify-center rounded-full transition-all hover:scale-110 shadow-sm",
-                    isAuthenticated && isInCompare(pg.id)
+                    isAuthenticated && isInCompare(pgId)
                       ? "bg-primary text-white hover:bg-primary/90"
                       : "bg-white/95 text-gray-700 hover:bg-white"
                   )}
                   aria-label="Compare property"
                 >
-                  {isAuthenticated && isInCompare(pg.id) ? (
+                  {isAuthenticated && isInCompare(pgId) ? (
                     <Check className="h-4 w-4" />
                   ) : (
                     <GitCompare className="h-4 w-4" />
@@ -491,7 +501,7 @@ Regards,
                 </button>
               </TooltipTrigger>
               <TooltipContent side="left" className="text-sm">
-                <p>{isAuthenticated && isInCompare(pg.id) ? "Remove from compare" : "Add to compare"}</p>
+                <p>{isAuthenticated && isInCompare(pgId) ? "Remove from compare" : "Add to compare"}</p>
               </TooltipContent>
             </Tooltip>
           </div>
@@ -501,6 +511,23 @@ Regards,
             <span className="text-base font-bold text-primary">₹{pg.price.toLocaleString()}</span>
             <span className="text-xs text-muted-foreground">/month</span>
           </div>
+
+          {/* Virtual Tour Badge */}
+          {pg.virtualTour && (
+            <div
+              className="absolute bottom-2 left-2 z-10 rounded-md bg-red-600/90 px-3 py-1.5 shadow-sm backdrop-blur cursor-pointer hover:bg-red-700 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                window.open(pg.virtualTour, '_blank', 'noopener,noreferrer');
+              }}
+              title="Watch Virtual Tour"
+            >
+              <div className="flex items-center gap-1.5">
+                <Youtube className="h-3.5 w-3.5 text-white" />
+                <span className="text-xs font-semibold text-white">Virtual Tour</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Thumbnail Preview - Visible on hover/click */}
@@ -699,7 +726,7 @@ Regards,
               <Building className="h-3 w-3" />
               <span className="font-medium text-foreground">EasyTorent</span>
             </span>
-            <span className="text-xs">Listed on EasyTorent</span>
+            <span>Listed on EasyTorent</span>
           </div>
         </CardContent>
 

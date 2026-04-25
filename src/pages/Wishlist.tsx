@@ -2,7 +2,7 @@
 // src/pages/Wishlist.tsx
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, ArrowLeft, Loader2 } from 'lucide-react';
+import { Heart, ArrowLeft, Loader2, Bell, BellOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useWishlist } from '@/contexts/WishlistContext';
@@ -18,6 +18,8 @@ const Wishlist = () => {
   const [wishlistPGs, setWishlistPGs] = useState<TransformedPG[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [wishlistEmailEnabled, setWishlistEmailEnabled] = useState(true);
+  const [updatingPreference, setUpdatingPreference] = useState(false);
 
   useEffect(() => {
     if (wishlist.length > 0) {
@@ -114,6 +116,24 @@ const Wishlist = () => {
     });
   };
 
+  const toggleWishlistEmail = async () => {
+    if (!isAuthenticated) {
+      toast.error('Please login to manage notification preferences');
+      return;
+    }
+    try {
+      setUpdatingPreference(true);
+      const newValue = !wishlistEmailEnabled;
+      await api.updateWishlistEmailPreference(newValue);
+      setWishlistEmailEnabled(newValue);
+      toast.success(newValue ? 'Wishlist notifications enabled' : 'Wishlist notifications disabled');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update preference');
+    } finally {
+      setUpdatingPreference(false);
+    }
+  };
+
   const handleRemoveItem = (pgId: string, pgName: string) => {
     toggleWishlist(pgId);
     toast.success('Removed from Wishlist', {
@@ -181,13 +201,34 @@ const Wishlist = () => {
             </p>
           </div>
           
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Link to="/pg">
               <Button variant="outline" className="gap-2">
                 <ArrowLeft className="h-4 w-4" />
                 Back to Search
               </Button>
             </Link>
+            
+            {isAuthenticated && (
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={toggleWishlistEmail}
+                disabled={updatingPreference}
+              >
+                {wishlistEmailEnabled ? (
+                  <>
+                    <Bell className="h-4 w-4 text-green-600" />
+                    <span className="text-green-600">Notifications On</span>
+                  </>
+                ) : (
+                  <>
+                    <BellOff className="h-4 w-4 text-gray-400" />
+                    <span className="text-gray-400">Notifications Off</span>
+                  </>
+                )}
+              </Button>
+            )}
             
             {wishlistPGs.length > 0 && (
               <Button variant="destructive" onClick={handleClearWishlist}>

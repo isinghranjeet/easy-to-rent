@@ -21,6 +21,7 @@ import {
 import { BookingFormModal } from '@/components/pg/BookingFormModal';
 import { ReviewFormModal } from '@/components/pg/ReviewFormModal';
 import { PaymentModal } from '@/components/payment/PaymentModal';
+import { SimilarPGs } from '@/components/pg/SimilarPGs';
 
 const PGDetail = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -53,6 +54,7 @@ const PGDetail = () => {
     showBookingForm,
     setShowBookingForm,
     currentBookingId,
+    setCurrentBookingId,
     showPaymentModal,
     setShowPaymentModal,
     handleBookingSubmit,
@@ -263,6 +265,13 @@ const PGDetail = () => {
         setReviewRating={setReviewRating}
         setReviewComment={setReviewComment}
         onSubmitReview={handleSubmitReview}
+      />
+
+      {/* Similar Properties Section */}
+      <SimilarPGs
+        currentPgId={pg._id}
+        city={pg.city}
+        type={pg.type}
       />
 
       <Footer />
