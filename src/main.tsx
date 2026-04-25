@@ -12,14 +12,22 @@ if (!googleClientId) {
   console.error("VITE_GOOGLE_CLIENT_ID is not set in .env file");
 }
 
-createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    {googleClientId ? (
-      <GoogleOAuthProvider clientId={googleClientId}>
-        <App />
-      </GoogleOAuthProvider>
-    ) : (
-      <App />
-    )}
-  </React.StrictMode>
-);
+const container = document.getElementById("root")!;
+const root = createRoot(container);
+
+// 🔥 Fix: prevents first-frame flash (Vite/blank screen)
+requestAnimationFrame(() => {
+  setTimeout(() => {
+    root.render(
+      <React.StrictMode>
+        {googleClientId ? (
+          <GoogleOAuthProvider clientId={googleClientId}>
+            <App />
+          </GoogleOAuthProvider>
+        ) : (
+          <App />
+        )}
+      </React.StrictMode>
+    );
+  }, 0);
+});
