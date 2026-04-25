@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Toaster } from "./components/ui/toaster";
 import { Toaster as Sonner } from "./components/ui/sonner";
 import { TooltipProvider } from "./components/ui/tooltip";
@@ -70,44 +70,50 @@ const RoleGate = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-/* ---------------- SPLASH CONTROLLER - ONLY ONCE ---------------- */
+/* ---------------- SPLASH CONTROLLER - ONLY ONE TIME EVER ---------------- */
 const SplashController = ({ children }: { children: React.ReactNode }) => {
-  const [showSplash, setShowSplash] = React.useState(true);
+  const [showSplash, setShowSplash] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
 
-  React.useEffect(() => {
-    // Check both localStorage (permanent) and sessionStorage (session)
-    const hasSeenPermanent = localStorage.getItem("splash_seen_permanent");
-    const hasSeenSession = sessionStorage.getItem("splash_seen_session");
-
-    // If splash was shown before (in any session), skip it
+  useEffect(() => {
+    // Check if user has seen splash before (permanent storage)
+    const hasSeenPermanent = localStorage.getItem("easytorent_splash_complete");
+    
     if (hasSeenPermanent) {
+      // Returning user - no splash, directly show app
       setShowSplash(false);
+      setIsChecking(false);
       return;
     }
 
-    // If splash was shown in this session (on refresh), skip it
-    if (hasSeenSession) {
-      setShowSplash(false);
-      return;
-    }
-
-    // First time ever - show splash screen
+    // First time user - show splash
+    setShowSplash(true);
+    
+    // Auto hide splash after duration
     const timer = setTimeout(() => {
       setShowSplash(false);
-      // Mark as seen in this session (prevents showing on refresh)
-      sessionStorage.setItem("splash_seen_session", "true");
-      // Mark as seen permanently (prevents showing in future sessions)
-      localStorage.setItem("splash_seen_permanent", "true");
-    }, 2800); // Splash duration
+      // Mark as seen permanently (never show again)
+      localStorage.setItem("easytorent_splash_complete", "true");
+      setIsChecking(false);
+    }, 2800); // 2.8 seconds splash duration
 
     return () => clearTimeout(timer);
   }, []);
 
-  // Show splash only on first visit
-  if (showSplash) {
-    return <SplashScreen />;
+  // Show nothing while checking
+  if (isChecking) {
+    return null;
   }
 
+  // Show splash on first visit only
+  if (showSplash) {
+    return <SplashScreen onComplete={() => {
+      setShowSplash(false);
+      setIsChecking(false);
+    }} />;
+  }
+
+  // Show app content
   return <>{children}</>;
 };
 
