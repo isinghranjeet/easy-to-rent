@@ -91,7 +91,7 @@ const HomeLogo = () => (
 export const PGCard = memo(({ pg, index = 0, variant = 'default' }: PGCardProps) => {
   const [currentImage, setCurrentImage] = useState(0);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [pendingAction, setPendingAction] = useState<'wishlist' | 'compare' | null>(null);
+  const [pendingAction, setPendingAction] = useState<'wishlist' | 'compare' | 'call' | 'whatsapp' | null>(null);
   const [isHovered, setIsHovered] = useState(false);
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
@@ -290,12 +290,22 @@ Regards,
   const onCall = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!isAuthenticated) {
+      setPendingAction('call');
+      setShowAuthModal(true);
+      return;
+    }
     handlePhoneCall(pg as any);
   };
 
   const onWhatsApp = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!isAuthenticated) {
+      setPendingAction('whatsapp');
+      setShowAuthModal(true);
+      return;
+    }
     handleWhatsAppContact(pg as any);
   };
 
@@ -304,6 +314,10 @@ Regards,
       toggleWishlist(pgId);
     } else if (pendingAction === 'compare') {
       toggleCompare(pgId);
+    } else if (pendingAction === 'call') {
+      handlePhoneCall(pg as any);
+    } else if (pendingAction === 'whatsapp') {
+      handleWhatsAppContact(pg as any);
     }
     setPendingAction(null);
   };

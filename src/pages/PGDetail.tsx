@@ -5,6 +5,8 @@ import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { AuthModal } from '@/components/AuthModal';
 import { usePGDetail } from '@/hooks/usePGDetail';
 import { useReviews } from '@/hooks/useReviews';
 import { useBooking } from '@/hooks/useBooking';
@@ -61,11 +63,14 @@ const PGDetail = () => {
   } = useBooking(pg);
 
   const { handlePhoneCall, handleWhatsAppContact } = useContact();
+  const { isAuthenticated } = useAuth();
 
   // Local UI state
   const [currentImage, setCurrentImage] = useState(0);
   const [showGallery, setShowGallery] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [pendingContactAction, setPendingContactAction] = useState<'call' | 'whatsapp' | null>(null);
 
   const handleOpenGallery = (index: number) => {
     setCurrentImage(index);
@@ -225,8 +230,22 @@ const PGDetail = () => {
               calculatedPrice={calculatedPrice}
               totalSavings={totalSavings}
               onBookNow={() => setShowBookingForm(true)}
-              onCall={() => handlePhoneCall(pg)}
-              onWhatsApp={() => handleWhatsAppContact(pg)}
+              onCall={() => {
+                if (!isAuthenticated) {
+                  setPendingContactAction('call');
+                  setShowAuthModal(true);
+                  return;
+                }
+                handlePhoneCall(pg);
+              }}
+              onWhatsApp={() => {
+                if (!isAuthenticated) {
+                  setPendingContactAction('whatsapp');
+                  setShowAuthModal(true);
+                  return;
+                }
+                handleWhatsAppContact(pg);
+              }}
             />
           </div>
         </div>
@@ -265,6 +284,23 @@ const PGDetail = () => {
         setReviewRating={setReviewRating}
         setReviewComment={setReviewComment}
         onSubmitReview={handleSubmitReview}
+      />
+
+      {/* Auth Modal for contact actions */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => {
+          setShowAuthModal(false);
+          setPendingContactAction(null);
+        }}
+        onSuccess={() => {
+          if (pendingContactAction === 'call' && pg) {
+            handlePhoneCall(pg);
+          } else if (pendingContactAction === 'whatsapp' && pg) {
+            handleWhatsAppContact(pg);
+          }
+          setPendingContactAction(null);
+        }}
       />
 
       {/* Similar Properties Section */}
