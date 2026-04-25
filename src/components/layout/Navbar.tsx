@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { useWishlist } from "@/contexts/WishlistContext";
 import { useCompare } from "@/contexts/CompareContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { InstallButton } from "@/components/pwa/InstallButton";
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -152,6 +153,9 @@ export function Navbar() {
                     <Search className="h-4 w-4" />
                     <span className="text-sm font-medium">Search PG</span>
                   </Link>
+
+                  {/* PWA Install Button - Desktop */}
+                  <InstallButton variant="navbar" />
                 </>
               )}
 

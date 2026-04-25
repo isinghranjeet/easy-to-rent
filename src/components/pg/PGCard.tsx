@@ -285,18 +285,7 @@ Regards,
 
   const handleContactClick = (type: 'call' | 'whatsapp', e: React.MouseEvent) => {
     e.stopPropagation();
-    
-    if (!isAuthenticated) {
-      toast({
-        title: "Login Required",
-        description: "Please login to contact the property owner",
-        duration: 3000,
-      });
-      setPendingAction(null);
-      setShowAuthModal(true);
-      return;
-    }
-    
+
     toast({
       title: "EasyTorent Support",
       description: `Connecting you with our support team`,

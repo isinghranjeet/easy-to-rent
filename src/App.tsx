@@ -53,6 +53,8 @@ import Dashboard from "./pages/Dashboard";
 
 import { useAuth } from "./contexts/AuthContext";
 import { Navigate, useLocation } from "react-router-dom";
+import { InstallBanner } from "./components/pwa/InstallBanner";
+import { InstallButton } from "./components/pwa/InstallButton";
 
 const queryClient = new QueryClient();
 
@@ -82,6 +84,10 @@ const App = () => (
         <WishlistProvider>
           <CompareProvider>
             <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+              {/* Global PWA Install UI */}
+              <InstallBanner />
+              <InstallButton variant="floating" />
+
               <Routes>
                 {/* ================= Public Routes (Tenant-Facing) ================= */}
                 <Route path="/" element={<RoleGate><Index /></RoleGate>} />
