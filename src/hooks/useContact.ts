@@ -12,16 +12,16 @@ const STATIC_PHONE = '9315058665';
 export const useContact = (): UseContactReturn => {
   const handlePhoneCall = useCallback(
     (pg: PGListing | null) => {
-      const phoneNumber = pg?.ownerPhone || STATIC_PHONE;
+      const phoneNumber = pg?.ownerPhone || pg?.contactPhone || STATIC_PHONE;
       window.location.href = `tel:${phoneNumber}`;
-      toast.success(`Connecting you to ${pg?.name} owner`);
+      toast.success(`Connecting you to ${pg?.name || 'property'} owner`);
     },
     []
   );
 
   const handleWhatsAppContact = useCallback(
     (pg: PGListing | null) => {
-      const phoneNumber = pg?.ownerPhone || STATIC_PHONE;
+      const phoneNumber = pg?.ownerPhone || pg?.contactPhone || STATIC_PHONE;
       const message = encodeURIComponent(
         `Hello,\n\nI'm interested in "${pg?.name}" on EasyTorent.\n` +
           `📍 Price: ₹${pg?.price?.toLocaleString()}/month\n` +
@@ -31,7 +31,7 @@ export const useContact = (): UseContactReturn => {
           `Thanks!`
       );
       window.open(`https://wa.me/91${phoneNumber}?text=${message}`, '_blank');
-      toast.success(`Opening WhatsApp chat with ${pg?.name} owner`);
+      toast.success(`Opening WhatsApp chat with ${pg?.name || 'property'} owner`);
     },
     []
   );

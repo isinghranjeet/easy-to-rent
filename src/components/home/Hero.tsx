@@ -60,10 +60,17 @@ export function Hero() {
       let locationData = [];
 
       if (response.success && response.data?.length > 0) {
-        locationData = response.data.map((loc: any) => ({
-          name: capitalize(loc.name),
-          slug: loc.slug,
-        }));
+        const seen = new Set<string>();
+        locationData = response.data
+          .map((loc: any) => ({
+            name: capitalize(loc.name),
+            slug: loc.slug,
+          }))
+          .filter((loc: { name: string; slug: string }) => {
+            if (seen.has(loc.slug)) return false;
+            seen.add(loc.slug);
+            return true;
+          });
       } else {
         const pgResult = await api.request<any>("/api/pg?limit=100");
         const listings =

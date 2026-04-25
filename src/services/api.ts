@@ -235,6 +235,8 @@ export class ApiService {
   private cache: RequestCache;
   private retryCount: number = 3;
   private retryDelay: number = 1000;
+  private isRefreshing: boolean = false;
+  private refreshQueue: Array<() => void> = [];
 
   constructor() {
     this.baseURL = API_BASE_URL;
@@ -244,19 +246,35 @@ export class ApiService {
   setToken(token: string) {
     this.token = token;
     localStorage.setItem('auth_token', token);
+    console.log('🔑 [AUTH] Token set in api service');
+  }
+
+  setRefreshToken(refreshToken: string) {
+    localStorage.setItem('auth_refresh_token', refreshToken);
+    console.log('🔑 [AUTH] Refresh token set');
+  }
+
+  getRefreshToken(): string | null {
+    return localStorage.getItem('auth_refresh_token');
+  }
+
+  clearRefreshToken() {
+    localStorage.removeItem('auth_refresh_token');
+    console.log('🗑️ [AUTH] Refresh token cleared');
   }
 
   getToken(): string | null {
-    if (!this.token) {
-      this.token = localStorage.getItem('auth_token');
-    }
+    // Always read fresh from localStorage to avoid stale token
+    this.token = localStorage.getItem('auth_token');
     return this.token;
   }
 
   clearToken() {
     this.token = null;
     localStorage.removeItem('auth_token');
+    this.clearRefreshToken();
     this.cache.clear();
+    console.log('🗑️ [AUTH] Token cleared from api service');
   }
 
   clearCache() {
@@ -288,14 +306,24 @@ export class ApiService {
     }
   }
 
+  private async processRefreshQueue(success: boolean) {
+    const queue = [...this.refreshQueue];
+    this.refreshQueue = [];
+    queue.forEach(resolve => resolve());
+  }
+
+  private async waitForRefresh(): Promise<void> {
+    return new Promise((resolve) => {
+      this.refreshQueue.push(resolve);
+    });
+  }
+
   public async request<T>(
     endpoint: string,
     options: RequestInit = {},
     skipCache: boolean = false
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
-    const token = this.getToken();
-
     const isFormData = options.body instanceof FormData;
     const method = options.method || 'GET';
     
@@ -313,23 +341,37 @@ export class ApiService {
       }
     }
 
-    const headers: HeadersInit = {
-      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
-      'Accept': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-      ...options.headers,
+    // ────────────────── Build Headers Fresh Each Time ──────────────────
+    const buildHeaders = (): HeadersInit => {
+      const token = this.getToken();
+      const headers: HeadersInit = {
+        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+        'Accept': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers,
+      };
+      return headers;
     };
 
-    const config: RequestInit = {
+    const buildConfig = (): RequestInit => ({
       method,
       ...options,
-      headers,
+      headers: buildHeaders(),
       mode: 'cors',
-    };
+    });
 
     console.log(`🌐 [API_REQUEST] ${method} ${url}`);
     
-    const makeRequest = async (): Promise<T> => {
+    const makeRequest = async (attempt: number = 1): Promise<T> => {
+      const config = buildConfig();
+      const currentToken = this.getToken();
+      
+      // Debug logging
+      console.log(`🔍 [AUTH_DEBUG] Attempt ${attempt} for ${endpoint}`);
+      console.log(`🔍 [AUTH_DEBUG] Token present: ${!!currentToken}`);
+      console.log(`🔍 [AUTH_DEBUG] Token length: ${currentToken?.length || 0}`);
+      console.log(`🔍 [AUTH_DEBUG] Authorization header: ${(config.headers as any)?.Authorization || 'NOT SET'}`);
+
       try {
         const response = await fetch(url, config);
         
@@ -354,15 +396,73 @@ export class ApiService {
           
           if (response.status === 401) {
             console.warn(`🔐 [AUTH] 401 Unauthorized for ${endpoint}`);
+            console.warn(`🔐 [AUTH] Token was present: ${!!currentToken}`);
             
-            const isProtectedRoute = endpoint.includes('/api/payments/') || 
-                                      endpoint.includes('/api/recommendations/') ||
-                                      endpoint.includes('/api/bookings/');
-            
-            if (!isProtectedRoute) {
-              this.clearToken();
+            // ────────────────── 401 Retry Logic with Refresh Token ──────────────────
+            if (attempt === 1 && currentToken) {
+              console.log('🔄 [AUTH] Attempting token refresh for 401...');
+              
+              // Wait if another request is already refreshing
+              if (this.isRefreshing) {
+                console.log('⏳ [AUTH] Waiting for in-progress refresh...');
+                await this.waitForRefresh();
+                console.log('✅ [AUTH] Refresh complete, retrying request...');
+                return makeRequest(2);
+              }
+              
+              this.isRefreshing = true;
+              try {
+                const refreshToken = this.getRefreshToken();
+                
+                if (refreshToken) {
+                  console.log('🔄 [AUTH] Calling /api/auth/refresh with refresh token...');
+                  try {
+                    const refreshResponse = await fetch(`${this.baseURL}/api/auth/refresh`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ refreshToken }),
+                    });
+                    
+                    if (refreshResponse.ok) {
+                      const refreshData = await refreshResponse.json();
+                      if (refreshData.success && refreshData.data?.token) {
+                        console.log('✅ [AUTH] Token refreshed successfully');
+                        this.setToken(refreshData.data.token);
+                        if (refreshData.data.refreshToken) {
+                          this.setRefreshToken(refreshData.data.refreshToken);
+                        }
+                        this.isRefreshing = false;
+                        await this.processRefreshQueue(true);
+                        return makeRequest(2);
+                      }
+                    } else {
+                      const refreshError = await refreshResponse.json();
+                      console.error('❌ [AUTH] Refresh failed:', refreshError.message);
+                    }
+                  } catch (refreshErr: any) {
+                    console.error('❌ [AUTH] Refresh request failed:', refreshErr.message);
+                  }
+                } else {
+                  console.log('❌ [AUTH] No refresh token available');
+                }
+                
+                // Refresh failed or no refresh token - logout
+                console.log('❌ [AUTH] Token expired or invalid, dispatching unauthorized event');
+                this.clearToken();
+                window.dispatchEvent(new Event('unauthorized'));
+                
+                const error: any = new Error(data.message || 'Session expired. Please login again.');
+                error.status = 401;
+                throw error;
+              } finally {
+                this.isRefreshing = false;
+                await this.processRefreshQueue(false);
+              }
             }
             
+            // Second attempt also failed or no token
+            console.log('❌ [AUTH] 401 on retry or no token available');
+            this.clearToken();
             window.dispatchEvent(new Event('unauthorized'));
             
             const error: any = new Error(data.message || 'Unauthorized');
@@ -395,7 +495,7 @@ export class ApiService {
       }
     };
 
-    const requestPromise = this.retryRequest(makeRequest);
+    const requestPromise = this.retryRequest(() => makeRequest(1));
     
     if (isGetRequest && !endpoint.includes('/api/wishlist')) {
       this.cache.setPendingRequest(cacheKey, requestPromise);
@@ -421,8 +521,9 @@ export class ApiService {
         };
       }
 
-      const { token, ...userData } = response.data;
+      const { token, refreshToken, ...userData } = response.data;
       this.setToken(token);
+      if (refreshToken) this.setRefreshToken(refreshToken);
       this.clearCache();
       
       return {
@@ -442,8 +543,9 @@ export class ApiService {
     });
 
     if (response.success && response.data) {
-      const { token, ...userData } = response.data;
+      const { token, refreshToken, ...userData } = response.data;
       this.setToken(token);
+      if (refreshToken) this.setRefreshToken(refreshToken);
       this.clearCache();
       
       return {
@@ -477,8 +579,9 @@ export class ApiService {
     });
 
     if (response.success && response.data) {
-      const { token, ...userData } = response.data;
+      const { token, refreshToken, ...userData } = response.data;
       this.setToken(token);
+      if (refreshToken) this.setRefreshToken(refreshToken);
       return {
         success: true,
         message: response.message,
@@ -726,6 +829,26 @@ export class ApiService {
 
   async useContactCredit(pgId: string, contactType: 'call' | 'whatsapp'): Promise<ApiResponse<{ balance: number; contactNumber: string }>> {
     return this.request('/api/payments/use-contact-credit', { method: 'POST', body: JSON.stringify({ pgId, contactType }) });
+  }
+
+  // ────────────────── Contact Endpoints (Auth Protected) ──────────────────
+
+  async initiateContact(pgId: string, type: 'call' | 'whatsapp'): Promise<ApiResponse<{
+    allowed: boolean;
+    contactNumber: string;
+    type: string;
+    pgName: string;
+    whatsappUrl: string | null;
+    callUrl: string | null;
+  }>> {
+    return this.request('/api/contact/initiate', {
+      method: 'POST',
+      body: JSON.stringify({ pgId, type }),
+    });
+  }
+
+  async getContactHistory(): Promise<ApiResponse<any[]>> {
+    return this.request('/api/contact/history', { method: 'GET' });
   }
 
   // ────────────────── BOOKING ENDPOINTS ──────────────────

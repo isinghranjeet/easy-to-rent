@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // src/contexts/AuthContext.tsx
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { api, User, LoginCredentials, RegisterCredentials } from '@/services/api';
 import { toast } from 'sonner';
 
@@ -22,54 +22,61 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const isRefreshingRef = useRef(false);
 
   useEffect(() => {
     // Check for existing session
     const token = localStorage.getItem('auth_token');
+    const refreshToken = localStorage.getItem('auth_refresh_token');
     if (token) {
       api.setToken(token);
+      if (refreshToken) api.setRefreshToken(refreshToken);
       loadUser();
     } else {
       setIsLoading(false);
     }
 
-    // Listen for unauthorized events - DON'T auto logout immediately
-    window.addEventListener('unauthorized', handleUnauthorized);
-    return () => window.removeEventListener('unauthorized', handleUnauthorized);
-  }, []);
-
-  const handleUnauthorized = async () => {
-    console.log('Unauthorized event received - attempting to refresh session');
-    
-    // Don't logout immediately - try to refresh session first
-    const refreshed = await refreshSession();
-    
-    if (!refreshed) {
-      // Only logout if refresh failed
-      console.log('Session refresh failed, logging out');
+    // Listen for unauthorized events
+    const handleUnauthorizedEvent = () => {
+      console.log('🚨 [AUTH_CONTEXT] Unauthorized event received');
+      // The api.ts has already attempted retry. If we get here, token is truly invalid.
+      // Logout the user.
       setUser(null);
       api.clearToken();
       toast.error('Session expired. Please login again.');
-    }
-  };
+    };
+
+    window.addEventListener('unauthorized', handleUnauthorizedEvent);
+    return () => window.removeEventListener('unauthorized', handleUnauthorizedEvent);
+  }, []);
 
   const refreshSession = async (): Promise<boolean> => {
-    if (isRefreshing) return false;
+    if (isRefreshingRef.current) {
+      console.log('⏳ [AUTH_CONTEXT] Refresh already in progress, skipping');
+      return false;
+    }
     
-    setIsRefreshing(true);
+    isRefreshingRef.current = true;
+    console.log('🔄 [AUTH_CONTEXT] Attempting session refresh...');
+    
     try {
-      // Try to refresh token (if you have a refresh endpoint)
-      // For now, just try to load user with existing token
+      const token = api.getToken();
+      if (!token) {
+        console.log('❌ [AUTH_CONTEXT] No token available for refresh');
+        return false;
+      }
+      
+      // Try to validate token by loading user profile
       const response = await api.getCurrentUser();
       if (response.success && response.data) {
+        console.log('✅ [AUTH_CONTEXT] Session refresh successful');
         setUser(response.data);
         return true;
       }
-    } catch (error) {
-      console.error('Session refresh failed:', error);
+    } catch (error: any) {
+      console.error('❌ [AUTH_CONTEXT] Session refresh failed:', error.message);
     } finally {
-      setIsRefreshing(false);
+      isRefreshingRef.current = false;
     }
     return false;
   };
@@ -82,11 +89,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         api.clearToken();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load user:', error);
-      // Don't clear token on network errors
-      if ((error as any)?.status !== 401) {
-        // Only clear token if it's a 401 auth error
+      // Only clear token on 401 auth error, not network errors
+      if (error?.status === 401) {
         api.clearToken();
       }
     } finally {

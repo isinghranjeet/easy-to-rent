@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useCallback, memo, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -34,8 +34,10 @@ import { AuthModal } from '@/components/AuthModal';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
+import { useContact } from '@/hooks/useContact';
+
 interface BackendPG {
-  _id?: string;
+  _id: string;
   id?: string;
   name: string;
   slug?: string;
@@ -283,14 +285,18 @@ Regards,
     }
   };
 
-  const handleContactClick = (type: 'call' | 'whatsapp', e: React.MouseEvent) => {
-    e.stopPropagation();
+  const { handlePhoneCall, handleWhatsAppContact } = useContact();
 
-    toast({
-      title: "EasyTorent Support",
-      description: `Connecting you with our support team`,
-      duration: 2000,
-    });
+  const onCall = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handlePhoneCall(pg as any);
+  };
+
+  const onWhatsApp = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handleWhatsAppContact(pg as any);
   };
 
   const handleSuccess = () => {
@@ -678,35 +684,23 @@ Regards,
               Details
             </Button>
 
-            <a 
-              href={callUrl} 
-              onClick={(e) => handleContactClick('call', e)}
-              className="block"
+            <Button
+              size="sm"
+              className="h-8 w-full gap-1.5 bg-gradient-to-r from-orange-500 to-orange-600 px-0 text-sm font-medium hover:from-orange-600 hover:to-orange-700"
+              onClick={onCall}
             >
-              <Button
-                size="sm"
-                className="h-8 w-full gap-1.5 bg-gradient-to-r from-orange-500 to-orange-600 px-0 text-sm font-medium hover:from-orange-600 hover:to-orange-700"
-              >
-                <Phone className="h-3.5 w-3.5" />
-                Call
-              </Button>
-            </a>
+              <Phone className="h-3.5 w-3.5" />
+              Call
+            </Button>
 
-            <a 
-              href={whatsappUrl} 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              onClick={(e) => handleContactClick('whatsapp', e)}
-              className="block"
+            <Button
+              size="sm"
+              className="h-8 w-full gap-1.5 bg-gradient-to-r from-green-500 to-green-600 px-0 text-sm font-medium text-white hover:from-green-600 hover:to-green-700"
+              onClick={onWhatsApp}
             >
-              <Button
-                size="sm"
-                className="h-8 w-full gap-1.5 bg-gradient-to-r from-green-500 to-green-600 px-0 text-sm font-medium text-white hover:from-green-600 hover:to-green-700"
-              >
-                <MessageCircle className="h-3.5 w-3.5" />
-                Chat
-              </Button>
-            </a>
+              <MessageCircle className="h-3.5 w-3.5" />
+              Chat
+            </Button>
           </div>
 
           {/* EasyTorent Footer */}

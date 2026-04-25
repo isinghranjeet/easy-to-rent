@@ -55,6 +55,7 @@ import { useAuth } from "./contexts/AuthContext";
 import { Navigate, useLocation } from "react-router-dom";
 import { InstallBanner } from "./components/pwa/InstallBanner";
 import { InstallButton } from "./components/pwa/InstallButton";
+import { SplashScreen } from "./components/pwa/SplashScreen";
 
 const queryClient = new QueryClient();
 
@@ -84,11 +85,12 @@ const App = () => (
         <WishlistProvider>
           <CompareProvider>
             <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-              {/* Global PWA Install UI */}
-              <InstallBanner />
-              <InstallButton variant="floating" />
+              <SplashScreen>
+                {/* Global PWA Install UI */}
+                <InstallBanner />
+                <InstallButton variant="floating" />
 
-              <Routes>
+                <Routes>
                 {/* ================= Public Routes (Tenant-Facing) ================= */}
                 <Route path="/" element={<RoleGate><Index /></RoleGate>} />
                 <Route path="/login" element={<Login />} />
@@ -143,6 +145,7 @@ const App = () => (
                 {/* ================= 404 ================= */}
                 <Route path="*" element={<RoleGate><NotFound /></RoleGate>} />
               </Routes>
+              </SplashScreen>
             </BrowserRouter>
           </CompareProvider>
         </WishlistProvider>
