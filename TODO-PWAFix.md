@@ -11,6 +11,7 @@
 - [x] 3. Fix `vite.config.ts` — precise manualChunks regex, add dedupe + optimizeDeps
 - [x] 4. Fix `sw.ts` — add `skipWaiting`, aggressive old cache cleanup
 - [x] 5. Fix `main.tsx` — replace manual SW registration with `virtual:pwa-register`
-- [ ] 6. Run cache-clearing commands
-- [ ] 7. Build and verify
+- [x] 6. Extract inline styles from `index.html` to `public/boot-screen.css` (fixes `vite-plugin-pwa` build error)
+- [x] 7. Run cache-clearing commands
+- [x] 8. Build and verify — SUCCESS
 
