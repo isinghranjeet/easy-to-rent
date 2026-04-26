@@ -63,13 +63,20 @@ export default defineConfig(async () => {
       rollupOptions: {
         output: {
           manualChunks(id: string) {
-            // React core — EXACT directory match (was matching react-router-dom before)
-            if (/[\\/]node_modules[\\/](react|react-dom)[\\/]/.test(id)) {
-              return 'react-vendor';
-            }
-            // Router
-            if (/[\\/]node_modules[\\/](react-router|@remix-run)[\\/]/.test(id)) {
-              return 'router-vendor';
+            /* ═══════════════════════════════════════════════════════════════
+               REACT CORE — All React ecosystem packages in ONE chunk.
+               This prevents circular dependencies (vendor → react → vendor)
+               that cause "Cannot read properties of undefined (reading
+               'createContext')" when chunks load out of order.
+               Includes: react, react-dom, scheduler, loose-envify (transitive
+               deps), react-router, react-router-dom, @remix-run.
+               ═══════════════════════════════════════════════════════════════ */
+            if (
+              /[\\/]node_modules[\\/](react|react-dom|scheduler|loose-envify|react-router|react-router-dom|@remix-run)[\\/]/.test(
+                id
+              )
+            ) {
+              return 'react-core';
             }
             // UI / Charts / Animation
             if (/[\\/]node_modules[\\/](recharts|framer-motion)[\\/]/.test(id)) {
