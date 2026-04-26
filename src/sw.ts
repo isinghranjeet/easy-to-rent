@@ -10,6 +10,8 @@ import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 // Tell TypeScript this is a Service Worker global scope
 declare const self: ServiceWorkerGlobalScope;
 
+const CACHE_VERSION = 'v2';
+
 /* ═══════════════════════════════════════════════════════════════════
    PRECACHE STATIC ASSETS
    vite-plugin-pwa injects the build manifest into self.__WB_MANIFEST
@@ -19,6 +21,29 @@ precacheAndRoute(self.__WB_MANIFEST);
 
 // Remove old caches whenever a new service worker activates
 cleanupOutdatedCaches();
+
+// Aggressively skip waiting so new SW activates immediately
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
+// Claim clients and purge legacy runtime caches on activation
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          // Delete old runtime caches that aren't part of current Workbox precache
+          const isCurrentPrecache = cacheName.includes('workbox-precache');
+          if (!isCurrentPrecache) {
+            console.log('[SW] Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    }).then(() => self.clients.claim())
+  );
+});
 
 /* ═══════════════════════════════════════════════════════════════════
    API ROUTES — Stale-While-Revalidate
@@ -129,10 +154,5 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
-});
-
-// Claim clients so the SW controls all tabs immediately
-self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
 });
 

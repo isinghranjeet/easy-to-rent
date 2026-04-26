@@ -25,7 +25,8 @@ export default defineConfig(async () => {
           globPatterns: [
             '**/*.{js,css,html,ico,png,svg,woff2,woff,ttf}',
           ],
-          globIgnores: ['**/node_modules/**/*'],
+          globIgnores: ['**/node_modules/**/*', '**/dev-dist/**/*'],
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         },
         devOptions: {
           enabled: true,
@@ -47,6 +48,10 @@ export default defineConfig(async () => {
       alias: {
         '@': path.resolve(__dirname, './src'),
       },
+      dedupe: ['react', 'react-dom'],
+    },
+    optimizeDeps: {
+      include: ['react', 'react-dom', 'react-router-dom'],
     },
     define: {
 
@@ -58,24 +63,24 @@ export default defineConfig(async () => {
       rollupOptions: {
         output: {
           manualChunks(id: string) {
-            // React ecosystem
-            if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
+            // React core — EXACT directory match (was matching react-router-dom before)
+            if (/[\\/]node_modules[\\/](react|react-dom)[\\/]/.test(id)) {
               return 'react-vendor';
             }
             // Router
-            if (id.includes('node_modules/react-router') || id.includes('node_modules/@remix-run')) {
+            if (/[\\/]node_modules[\\/](react-router|@remix-run)[\\/]/.test(id)) {
               return 'router-vendor';
             }
-            // UI / Charts
-            if (id.includes('node_modules/recharts') || id.includes('node_modules/framer-motion')) {
+            // UI / Charts / Animation
+            if (/[\\/]node_modules[\\/](recharts|framer-motion)[\\/]/.test(id)) {
               return 'ui-vendor';
             }
             // TanStack Query
-            if (id.includes('node_modules/@tanstack')) {
+            if (/[\\/]node_modules[\\/](@tanstack)[\\/]/.test(id)) {
               return 'query-vendor';
             }
             // Large utility libraries
-            if (id.includes('node_modules/lodash') || id.includes('node_modules/moment')) {
+            if (/[\\/]node_modules[\\/](lodash|moment)[\\/]/.test(id)) {
               return 'utils-vendor';
             }
             // Everything else from node_modules
