@@ -24,7 +24,7 @@ interface InstallButtonProps {
  */
 export function InstallButton({ variant = 'floating' }: InstallButtonProps) {
   // Get PWA install state from our custom hook
-  const { isInstalled, canShowButton, isIOS, isStandalone, promptInstall } = usePWAInstall();
+  const { isInstalled, isInstallable, isIOS, promptInstall } = usePWAInstall();
 
   // Local UI state
   const [isVisible, setIsVisible] = useState(false);        // Controls animation in/out
@@ -34,16 +34,15 @@ export function InstallButton({ variant = 'floating' }: InstallButtonProps) {
 
   /**
    * Determine visibility with a small delay for smooth entrance animation.
-   * We also double-check isStandalone to be safe.
    */
   useEffect(() => {
-    if (canShowButton && !isInstalled && !isStandalone) {
+    if (isInstallable && !isInstalled) {
       const timer = setTimeout(() => setIsVisible(true), 300);
       return () => clearTimeout(timer);
     } else {
       setIsVisible(false);
     }
-  }, [canShowButton, isInstalled, isStandalone]);
+  }, [isInstallable, isInstalled]);
 
   /**
    * Handle the install button click.

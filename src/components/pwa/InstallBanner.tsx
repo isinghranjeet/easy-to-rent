@@ -3,12 +3,13 @@ import { X, Download, Smartphone, Share2, ChevronUp } from 'lucide-react';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 
 export function InstallBanner() {
-  const { isInstalled, canShowBanner, isIOS, promptInstall, dismissBanner } = usePWAInstall();
+  const { isInstalled, isInstallable, isIOS, promptInstall } = usePWAInstall();
   const [isVisible, setIsVisible] = useState(false);
   const [showIOSHint, setShowIOSHint] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(false);
 
   useEffect(() => {
-    if (canShowBanner && !isInstalled) {
+    if (isInstallable && !isInstalled && !isDismissed) {
       // Small delay for smooth enter animation
       const timer = setTimeout(() => setIsVisible(true), 100);
       return () => clearTimeout(timer);
@@ -16,14 +17,14 @@ export function InstallBanner() {
       setIsVisible(false);
       setShowIOSHint(false);
     }
-  }, [canShowBanner, isInstalled]);
+  }, [isInstallable, isInstalled, isDismissed]);
 
   const handleDismiss = useCallback(() => {
     setIsVisible(false);
     setTimeout(() => {
-      dismissBanner();
+      setIsDismissed(true);
     }, 300);
-  }, [dismissBanner]);
+  }, []);
 
   const handleInstall = useCallback(async () => {
     if (isIOS) {
@@ -37,7 +38,7 @@ export function InstallBanner() {
     }
   }, [isIOS, promptInstall]);
 
-  if (isInstalled || !canShowBanner) return null;
+  if (isInstalled || !isInstallable || isDismissed) return null;
 
   return (
     <>

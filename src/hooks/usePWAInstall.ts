@@ -1,178 +1,127 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-// PWA Install Prompt Event Type (not in standard DOM types)
+/**
+ * The beforeinstallprompt event is fired when the PWA meets the installability criteria.
+ * It allows us to defer the install prompt and trigger it later programmatically.
+ */
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
   readonly userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
   prompt(): Promise<void>;
 }
 
-const STORAGE_KEYS = {
-  INSTALLED: 'pwaInstalled',
-  DISMISSED: 'pwaDismissed',
-  PAGE_VISITS: 'pwaPageVisits',
-} as const;
-
-const DISMISS_DURATION_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
-const BANNER_DELAY_MS = 7000; // 7 seconds
-const BANNER_MIN_PAGES = 2;
-
-interface PWAInstallState {
+/**
+ * Return type for the usePWAInstall hook.
+ */
+interface UsePWAInstallReturn {
+  /** True if the app is currently running in standalone mode (installed). */
   isInstalled: boolean;
+  /** True if the app can be installed (beforeinstallprompt fired, or iOS). */
   isInstallable: boolean;
+  /** True if the device is an iPhone/iPad/iPod. */
   isIOS: boolean;
-  isStandalone: boolean;
-  canShowBanner: boolean;
-  canShowButton: boolean;
+  /** Triggers the native install prompt. Returns true if user accepted. */
   promptInstall: () => Promise<boolean>;
-  dismissBanner: () => void;
 }
 
+/**
+ * Detects if the app is running as an installed PWA.
+ * Checks both standard display-mode and iOS navigator.standalone.
+ */
 function getIsStandalone(): boolean {
   if (typeof window === 'undefined') return false;
   return (
     window.matchMedia('(display-mode: standalone)').matches ||
-    // @ts-expect-error navigator.standalone is iOS-specific
+    // @ts-expect-error navigator.standalone is iOS-specific and not in standard types
     navigator.standalone === true
   );
 }
 
+/**
+ * Detects iOS devices by checking the user agent string.
+ */
 function getIsIOS(): boolean {
   if (typeof window === 'undefined') return false;
   const ua = window.navigator.userAgent.toLowerCase();
   return /iphone|ipad|ipod/.test(ua);
 }
 
-function getLocalStorageItem(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function setLocalStorageItem(key: string, value: string): void {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // ignore
-  }
-}
-
-function isDismissedExpired(): boolean {
-  const dismissedAt = getLocalStorageItem(STORAGE_KEYS.DISMISSED);
-  if (!dismissedAt) return true;
-  const dismissedTime = parseInt(dismissedAt, 10);
-  if (isNaN(dismissedTime)) return true;
-  return Date.now() - dismissedTime > DISMISS_DURATION_MS;
-}
-
-function getPageVisits(): number {
-  const visits = getLocalStorageItem(STORAGE_KEYS.PAGE_VISITS);
-  if (!visits) return 0;
-  const count = parseInt(visits, 10);
-  return isNaN(count) ? 0 : count;
-}
-
-function incrementPageVisits(): number {
-  const current = getPageVisits();
-  const next = current + 1;
-  setLocalStorageItem(STORAGE_KEYS.PAGE_VISITS, String(next));
-  return next;
-}
-
-export function usePWAInstall(): PWAInstallState {
+/**
+ * usePWAInstall
+ *
+ * A robust PWA install detection hook that relies purely on browser APIs.
+ * NO localStorage is used for install detection, so uninstall/re-install cycles work correctly.
+ *
+ * How it works:
+ * 1. On mount, checks if the app is running in standalone mode via matchMedia.
+ * 2. Listens for the `beforeinstallprompt` event to know when the browser thinks the app is installable.
+ * 3. Listens for the `appinstalled` event to detect successful installation.
+ * 4. Listens for changes to `display-mode: standalone` to detect installation/uninstallation.
+ * 5. On iOS (which doesn't support beforeinstallprompt), treats the app as installable if not already standalone.
+ */
+export function usePWAInstall(): UsePWAInstallReturn {
   const [isInstalled, setIsInstalled] = useState<boolean>(false);
   const [isInstallable, setIsInstallable] = useState<boolean>(false);
   const [isIOS, setIsIOS] = useState<boolean>(false);
-  const [isStandalone, setIsStandalone] = useState<boolean>(false);
-  const [canShowBanner, setCanShowBanner] = useState<boolean>(false);
-  const [canShowButton, setCanShowButton] = useState<boolean>(false);
 
+  // Store the deferred install prompt so we can trigger it later
   const deferredPromptRef = useRef<BeforeInstallPromptEvent | null>(null);
-  const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hasIncrementedRef = useRef<boolean>(false);
 
-  // Initialize state
+  /**
+   * Initialize state on mount.
+   * We check standalone mode immediately so the UI is correct on first render.
+   */
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const standalone = getIsStandalone();
     const ios = getIsIOS();
-    const storedInstalled = getLocalStorageItem(STORAGE_KEYS.INSTALLED) === 'true';
 
-    setIsStandalone(standalone);
+    setIsInstalled(standalone);
     setIsIOS(ios);
-    setIsInstalled(standalone || storedInstalled);
 
-    // If already installed, nothing else to do
-    if (standalone || storedInstalled) {
-      setCanShowBanner(false);
-      setCanShowButton(false);
-      return;
+    // iOS Safari does not fire beforeinstallprompt, but the app is still installable
+    // manually via Share → Add to Home Screen. We mark it installable here.
+    if (ios && !standalone) {
+      setIsInstallable(true);
     }
-
-    // Check if we have a deferred prompt (Chrome/Edge/Android)
-    const hasDeferredPrompt = deferredPromptRef.current !== null;
-    const installable = hasDeferredPrompt || ios;
-    setIsInstallable(installable);
-
-    // Button shows if installable and not installed
-    setCanShowButton(installable);
-
-    // Banner logic: needs time OR page visits, and not dismissed recently
-    const visits = incrementPageVisits();
-    hasIncrementedRef.current = true;
-
-    const shouldShowBanner = isDismissedExpired();
-    if (!shouldShowBanner) return;
-
-    const meetsEngagementCriteria = visits >= BANNER_MIN_PAGES;
-
-    if (meetsEngagementCriteria) {
-      // Show after delay
-      bannerTimerRef.current = setTimeout(() => {
-        setCanShowBanner(true);
-      }, BANNER_DELAY_MS);
-    } else {
-      // Show after delay even on first page (gives user time to browse)
-      bannerTimerRef.current = setTimeout(() => {
-        setCanShowBanner(true);
-      }, BANNER_DELAY_MS);
-    }
-
-    return () => {
-      if (bannerTimerRef.current) {
-        clearTimeout(bannerTimerRef.current);
-      }
-    };
   }, []);
 
-  // Listen for beforeinstallprompt
+  /**
+   * Set up event listeners for PWA install lifecycle events.
+   */
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    /**
+     * Fired when the app meets the installability criteria.
+     * We prevent the default mini-infobar and store the event for later use.
+     */
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       deferredPromptRef.current = e as BeforeInstallPromptEvent;
       setIsInstallable(true);
-      setCanShowButton(true);
     };
 
+    /**
+     * Fired when the PWA has been successfully installed.
+     */
     const handleAppInstalled = () => {
       setIsInstalled(true);
-      setCanShowBanner(false);
-      setCanShowButton(false);
-      setLocalStorageItem(STORAGE_KEYS.INSTALLED, 'true');
+      setIsInstallable(false);
       deferredPromptRef.current = null;
     };
 
+    /**
+     * Fired when the display mode changes (e.g. user installs or uninstalls the app).
+     * If it switches TO standalone, the app is now installed.
+     * Note: uninstalling usually requires a page reload for this to update,
+     * but on next visit the initial mount check will catch it.
+     */
     const handleDisplayModeChange = (e: MediaQueryListEvent) => {
       if (e.matches) {
         setIsInstalled(true);
-        setCanShowBanner(false);
-        setCanShowButton(false);
-        setLocalStorageItem(STORAGE_KEYS.INSTALLED, 'true');
+        setIsInstallable(false);
       }
     };
 
@@ -182,6 +131,7 @@ export function usePWAInstall(): PWAInstallState {
     const mql = window.matchMedia('(display-mode: standalone)');
     mql.addEventListener('change', handleDisplayModeChange);
 
+    // Cleanup: remove all listeners when the component unmounts
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
@@ -189,44 +139,44 @@ export function usePWAInstall(): PWAInstallState {
     };
   }, []);
 
+  /**
+   * Triggers the native browser install prompt.
+   * Returns true if the user clicked "Install", false otherwise.
+   */
   const promptInstall = useCallback(async (): Promise<boolean> => {
+    // Already installed — nothing to do
     if (isInstalled) return false;
 
     const deferredPrompt = deferredPromptRef.current;
     if (!deferredPrompt) return false;
 
     try {
+      // Show the native install prompt to the user
       deferredPrompt.prompt();
+
+      // Wait for the user to respond to the prompt
       const { outcome } = await deferredPrompt.userChoice;
+
+      // Clear the deferred prompt — it can only be used once
       deferredPromptRef.current = null;
 
       if (outcome === 'accepted') {
         setIsInstalled(true);
-        setCanShowBanner(false);
-        setCanShowButton(false);
-        setLocalStorageItem(STORAGE_KEYS.INSTALLED, 'true');
+        setIsInstallable(false);
         return true;
       }
+
       return false;
     } catch {
       return false;
     }
   }, [isInstalled]);
 
-  const dismissBanner = useCallback(() => {
-    setCanShowBanner(false);
-    setLocalStorageItem(STORAGE_KEYS.DISMISSED, String(Date.now()));
-  }, []);
-
   return {
     isInstalled,
     isInstallable,
     isIOS,
-    isStandalone,
-    canShowBanner,
-    canShowButton,
     promptInstall,
-    dismissBanner,
   };
 }
 
