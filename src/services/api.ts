@@ -241,15 +241,84 @@ export class ApiService {
   constructor() {
     this.baseURL = API_BASE_URL;
     this.cache = new RequestCache(5 * 60 * 1000);
+    
+    // ✅ CRITICAL FIX: Initialize token from localStorage on service creation
+    const storedToken = localStorage.getItem('auth_token');
+    if (storedToken && storedToken !== 'undefined' && storedToken !== 'null' && storedToken.length > 10) {
+      this.token = storedToken;
+      console.log('✅ [AUTH] Token loaded from localStorage on service init');
+      console.log('🔍 [AUTH] Token preview:', storedToken.substring(0, 30) + '...');
+    } else {
+      if (storedToken) {
+        console.warn('⚠️ [AUTH] Invalid token found in localStorage, clearing:', storedToken);
+        localStorage.removeItem('auth_token');
+      }
+      console.log('⚠️ [AUTH] No valid token found in localStorage on init');
+    }
+  }
+
+  // ✅ FIX: Validate JWT token
+  private isTokenValid(token: string): boolean {
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) {
+        console.error('❌ [AUTH] Invalid token format: wrong number of parts');
+        return false;
+      }
+      
+      const payload = JSON.parse(atob(parts[1]));
+      const exp = payload.exp * 1000; // Convert to milliseconds
+      const isValid = exp > Date.now();
+      
+      if (!isValid) {
+        console.log('⚠️ [AUTH] Token expired at:', new Date(exp));
+      }
+      
+      return isValid;
+    } catch (error) {
+      console.error('❌ [AUTH] Token validation error:', error);
+      return false;
+    }
   }
 
   setToken(token: string) {
+    // Validate token before storing
+    if (!token || token === 'undefined' || token === 'null' || token.length < 10) {
+      console.error('❌ [AUTH] Attempted to set invalid token:', {
+        tokenLength: token?.length,
+        tokenPreview: token?.substring(0, 20)
+      });
+      return;
+    }
+    
+    // Validate token structure
+    if (!this.isTokenValid(token)) {
+      console.error('❌ [AUTH] Invalid token structure, rejecting');
+      return;
+    }
+    
     this.token = token;
     localStorage.setItem('auth_token', token);
-    console.log('🔑 [AUTH] Token set in api service');
+    console.log('✅ [AUTH] Token set successfully:', {
+      length: token.length,
+      preview: `${token.substring(0, 30)}...`,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Verify storage worked
+    const verifyToken = localStorage.getItem('auth_token');
+    if (verifyToken === token) {
+      console.log('✅ [AUTH] Token storage verification successful');
+    } else {
+      console.error('❌ [AUTH] Token storage verification failed!');
+    }
   }
 
   setRefreshToken(refreshToken: string) {
+    if (!refreshToken || refreshToken === 'undefined' || refreshToken === 'null') {
+      console.error('❌ [AUTH] Attempted to set invalid refresh token');
+      return;
+    }
     localStorage.setItem('auth_refresh_token', refreshToken);
     console.log('🔑 [AUTH] Refresh token set');
   }
@@ -263,9 +332,28 @@ export class ApiService {
     console.log('🗑️ [AUTH] Refresh token cleared');
   }
 
+  // ✅ FIX: Always sync with localStorage
   getToken(): string | null {
     // Always read fresh from localStorage to avoid stale token
-    this.token = localStorage.getItem('auth_token');
+    const storedToken = localStorage.getItem('auth_token');
+    
+    // Validate token isn't a string literal
+    if (storedToken === 'undefined' || storedToken === 'null') {
+      console.warn('⚠️ [AUTH] Invalid token string detected, clearing');
+      this.clearToken();
+      return null;
+    }
+    
+    // Update class property if different
+    if (this.token !== storedToken) {
+      this.token = storedToken;
+      if (storedToken) {
+        console.log('🔄 [AUTH] Token synced from localStorage');
+      } else {
+        console.log('🔄 [AUTH] Token cleared from memory');
+      }
+    }
+    
     return this.token;
   }
 
@@ -275,6 +363,33 @@ export class ApiService {
     this.clearRefreshToken();
     this.cache.clear();
     console.log('🗑️ [AUTH] Token cleared from api service');
+  }
+
+  // ✅ NEW: Check authentication status
+  isAuthenticated(): boolean {
+    const token = this.getToken();
+    if (!token) return false;
+    
+    // Check token expiration
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return false;
+      
+      const payload = JSON.parse(atob(parts[1]));
+      const exp = payload.exp * 1000;
+      const isValid = exp > Date.now();
+      
+      if (!isValid) {
+        console.log('⚠️ [AUTH] Token expired, clearing');
+        this.clearToken();
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('❌ [AUTH] Token validation error:', error);
+      return false;
+    }
   }
 
   clearCache() {
@@ -318,6 +433,7 @@ export class ApiService {
     });
   }
 
+  // ✅ FIXED: Main request method with proper header handling
   public async request<T>(
     endpoint: string,
     options: RequestInit = {},
@@ -341,34 +457,51 @@ export class ApiService {
       }
     }
 
-    // ────────────────── Build Headers Fresh Each Time ──────────────────
-    const buildHeaders = (): HeadersInit => {
-      const token = this.getToken();
-      const headers: HeadersInit = {
-        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
-        'Accept': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...options.headers,
-      };
-      return headers;
-    };
-
-    const buildConfig = (): RequestInit => ({
-      method,
-      ...options,
-      headers: buildHeaders(),
-      mode: 'cors',
-    });
-
     console.log(`🌐 [API_REQUEST] ${method} ${url}`);
     
     const makeRequest = async (attempt: number = 1): Promise<T> => {
-      const config = buildConfig();
+      // ✅ Get fresh token for each attempt
       const currentToken = this.getToken();
+      
+      // ✅ Build headers fresh for each request
+      const headers: HeadersInit = {};
+      
+      // Add Content-Type if not FormData
+      if (!isFormData) {
+        headers['Content-Type'] = 'application/json';
+      }
+      
+      headers['Accept'] = 'application/json';
+      
+      // ✅ IMPORTANT: Only add Authorization if token exists and is valid
+      if (currentToken) {
+        // Validate token before using
+        if (this.isTokenValid(currentToken)) {
+          headers['Authorization'] = `Bearer ${currentToken}`;
+          console.log(`✅ [AUTH_DEBUG] Adding Authorization header for ${endpoint}`);
+        } else {
+          console.warn(`⚠️ [AUTH_DEBUG] Token exists but is invalid for ${endpoint}`);
+          // Clear invalid token
+          this.clearToken();
+        }
+      } else {
+        console.warn(`⚠️ [AUTH_DEBUG] No token available for ${endpoint}`);
+      }
+      
+      // Merge with options.headers (options.headers should override)
+      const finalHeaders = { ...headers, ...options.headers };
+      
+      const config: RequestInit = {
+        method,
+        ...options,
+        headers: finalHeaders,
+        mode: 'cors',
+      };
       
       // Debug logging
       console.log(`🔍 [AUTH_DEBUG] Attempt ${attempt} for ${endpoint}`);
       console.log(`🔍 [AUTH_DEBUG] Token present: ${!!currentToken}`);
+      console.log(`🔍 [AUTH_DEBUG] Token valid: ${currentToken ? this.isTokenValid(currentToken) : false}`);
       console.log(`🔍 [AUTH_DEBUG] Token length: ${currentToken?.length || 0}`);
       console.log(`🔍 [AUTH_DEBUG] Authorization header: ${(config.headers as any)?.Authorization || 'NOT SET'}`);
 
@@ -397,6 +530,7 @@ export class ApiService {
           if (response.status === 401) {
             console.warn(`🔐 [AUTH] 401 Unauthorized for ${endpoint}`);
             console.warn(`🔐 [AUTH] Token was present: ${!!currentToken}`);
+            console.warn(`🔐 [AUTH] Response message: ${data.message}`);
             
             // ────────────────── 401 Retry Logic with Refresh Token ──────────────────
             if (attempt === 1 && currentToken) {
@@ -432,7 +566,7 @@ export class ApiService {
                           this.setRefreshToken(refreshData.data.refreshToken);
                         }
                         this.isRefreshing = false;
-                        await this.processRefreshQueue(true);
+                        this.processRefreshQueue(true);
                         return makeRequest(2);
                       }
                     } else {
@@ -449,21 +583,21 @@ export class ApiService {
                 // Refresh failed or no refresh token - logout
                 console.log('❌ [AUTH] Token expired or invalid, dispatching unauthorized event');
                 this.clearToken();
-                window.dispatchEvent(new Event('unauthorized'));
+                window.dispatchEvent(new CustomEvent('unauthorized', { detail: { message: data.message } }));
                 
                 const error: any = new Error(data.message || 'Session expired. Please login again.');
                 error.status = 401;
                 throw error;
               } finally {
                 this.isRefreshing = false;
-                await this.processRefreshQueue(false);
+                this.processRefreshQueue(false);
               }
             }
             
             // Second attempt also failed or no token
             console.log('❌ [AUTH] 401 on retry or no token available');
             this.clearToken();
-            window.dispatchEvent(new Event('unauthorized'));
+            window.dispatchEvent(new CustomEvent('unauthorized', { detail: { message: data.message } }));
             
             const error: any = new Error(data.message || 'Unauthorized');
             error.status = 401;
@@ -603,34 +737,45 @@ export class ApiService {
 
   // ────────────────── ✅ NEW: Payment Endpoints ──────────────────
 
-  async createPaymentOrder(bookingId: string, amount: number): Promise<ApiResponse<{ 
-    orderId: string; 
-    amount: number; 
-    currency: string; 
-    keyId: string 
+  async createPaymentOrder(bookingId: string, amount: number): Promise<ApiResponse<{
+    provider: string;
+    orderId: string;
+    amount: number;
+    currency: string;
+    keyId: string;
+    paymentToken: string;
   }>> {
-    return this.request('/api/payments/create-order', {
+    return this.request('/api/payments/init', {
       method: 'POST',
-      body: JSON.stringify({ bookingId, amount })
+      body: JSON.stringify({ bookingId, amount, paymentMethod: 'razorpay' })
     });
   }
 
-  async verifyPayment(data: { 
-    bookingId: string; 
-    razorpay_order_id: string; 
-    razorpay_payment_id: string; 
-    razorpay_signature: string 
+  async verifyPayment(data: {
+    bookingId: string;
+    provider: string;
+    paymentToken: string;
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
   }): Promise<ApiResponse<{ booking: Booking }>> {
     return this.request('/api/payments/verify', {
       method: 'POST',
-      body: JSON.stringify(data)
+      headers: { 'x-payment-token': data.paymentToken },
+      body: JSON.stringify({
+        bookingId: data.bookingId,
+        provider: data.provider,
+        razorpay_order_id: data.razorpay_order_id,
+        razorpay_payment_id: data.razorpay_payment_id,
+        razorpay_signature: data.razorpay_signature
+      })
     });
   }
 
-  async getPaymentStatus(bookingId: string): Promise<ApiResponse<{ 
-    paymentStatus: string; 
-    razorpayOrderId?: string; 
-    razorpayPaymentId?: string 
+  async getPaymentStatus(bookingId: string): Promise<ApiResponse<{
+    paymentStatus: string;
+    razorpayOrderId?: string;
+    razorpayPaymentId?: string;
   }>> {
     return this.request(`/api/payments/status/${bookingId}`, { method: 'GET' });
   }

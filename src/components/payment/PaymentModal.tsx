@@ -22,6 +22,7 @@ declare global {
 export const PaymentModal = ({ isOpen, onClose, bookingId, amount, onSuccess }: PaymentModalProps) => {
   const [loading, setLoading] = useState(false);
   const [securityCheck, setSecurityCheck] = useState(false);
+  const [paymentToken, setPaymentToken] = useState<string>('');
 
   const loadRazorpayScript = (): Promise<boolean> => {
     return new Promise((resolve) => {
@@ -64,17 +65,22 @@ export const PaymentModal = ({ isOpen, onClose, bookingId, amount, onSuccess }: 
         throw new Error(orderResponse.message || 'Failed to create order');
       }
 
+      const { orderId, keyId, paymentToken: token, currency } = orderResponse.data;
+      setPaymentToken(token);
+
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-        amount: orderResponse.amount,
-        currency: orderResponse.currency,
+        key: keyId || import.meta.env.VITE_RAZORPAY_KEY_ID,
+        amount: amount * 100,
+        currency: currency || 'INR',
         name: 'EasyTorent',
         description: `Booking Payment - ${bookingId}`,
-        order_id: orderResponse.orderId,
+        order_id: orderId,
         handler: async (response: any) => {
           try {
             const verifyResponse = await api.verifyPayment({
               bookingId,
+              provider: 'razorpay',
+              paymentToken: token,
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature
