@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,9 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/services/api';
+import OtpModal from '../OtpModal';
 import { toast } from 'sonner';
 import { Loader2, Eye, EyeOff, Mail, Lock, User, Phone, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useNavigate } from 'react-router-dom';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -22,8 +24,11 @@ const LoginModal: React.FC<LoginModalProps> = ({
   onClose, 
   defaultTab = 'login' 
 }) => {
-  const { login: authLogin } = useAuth();
+  const { login: authLogin, user: authUser } = useAuth();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [is429Cooldown, setIs429Cooldown] = useState(false);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'login' | 'register'>(defaultTab);
   const [showPassword, setShowPassword] = useState(false);
@@ -48,6 +53,16 @@ const LoginModal: React.FC<LoginModalProps> = ({
   });
 
   const [registerErrors, setRegisterErrors] = useState<Record<string, string>>({});
+
+  // Cooldown timer
+  useEffect(() => {
+    if (cooldownSeconds > 0) {
+      const timer = setTimeout(() => setCooldownSeconds((s) => s - 1), 1000);
+      return () => clearTimeout(timer);
+    } else if (cooldownSeconds === 0 && is429Cooldown) {
+      setIs429Cooldown(false);
+    }
+  }, [cooldownSeconds, is429Cooldown]);
 
   // Handle login form input changes
   const handleLoginChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -124,17 +139,32 @@ const LoginModal: React.FC<LoginModalProps> = ({
   // Login through AuthContext
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (isLoading || is429Cooldown) return;
+    
     setIsLoading(true);
     setError(null);
     
-    try {
+try {
       await authLogin(loginData.email, loginData.password);
+      // Close modal and reset form on successful login (non-OTP)
       onClose();
       setLoginData({ email: '', password: '' });
     } catch (error: any) {
       if (error.message === 'OTP_REQUIRED') {
+        // ✅ FIX: Show OTP screen when required
         setShowOtpScreen(true);
-        toast.success('OTP sent!', { description: 'Check your email for the verification code.' });
+        return;
+      }
+
+      if (error.status === 429) {
+        const retryAfter = error.message.match(/(\\d+) seconds?/)?.[1] || '60';
+        const seconds = parseInt(retryAfter);
+        setCooldownSeconds(seconds);
+        setIs429Cooldown(true);
+        toast.error('Too many requests', {
+          description: `Please wait ${seconds}s before trying again`
+        });
         return;
       }
 
@@ -148,35 +178,23 @@ const LoginModal: React.FC<LoginModalProps> = ({
     }
   };
 
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await api.verifyLoginOtp(loginData.email, otpValue);
-
-      if (response.success && response.data) {
-        toast.success('Login successful!', {
-          description: `Welcome back, ${response.data.user?.name || 'User'}!`,
-        });
-        setShowOtpScreen(false);
-        setOtpValue('');
-        onClose();
-        setLoginData({ email: '', password: '' });
-        window.location.reload();
-      } else {
-        throw new Error('Verification failed');
-      }
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Failed to verify OTP';
-      console.error('Verify OTP error:', error);
-      setError(message);
-      toast.error('Verification failed', { description: message });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+// UNUSED - handled in OtpModal
+  // const handleVerifyOtp = async (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   setIsLoading(true);
+  //   setError(null);
+  //
+  //   try {
+  //
+  //   } catch (error: unknown) {
+  //     const message = error instanceof Error ? error.message : 'Failed to verify OTP';
+  //     console.error('Verify OTP error:', error);
+  //     setError(message);
+  //     toast.error('Verification failed', { description: message });
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
 
   // REGISTER FUNCTION
   const handleRegister = async (e: React.FormEvent) => {
@@ -287,69 +305,30 @@ const LoginModal: React.FC<LoginModalProps> = ({
           </p>
         </div>
 
-        {showOtpScreen ? (
-          <div className="space-y-4">
-            <div className="text-center space-y-2">
-              <Mail className="h-10 w-10 text-primary mx-auto mb-2" />
-              <h3 className="text-lg font-medium">Verify your email</h3>
-              <p className="text-sm text-gray-500">
-                We've sent a 6-digit OTP to <strong>{loginData.email}</strong>.
-              </p>
-            </div>
-            
-            <form onSubmit={handleVerifyOtp} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="otp">Enter OTP</Label>
-                <Input
-                  id="otp"
-                  type="text"
-                  placeholder="------"
-                  value={otpValue}
-                  onChange={(e) => {
-                    setOtpValue(e.target.value);
-                    if (error) setError(null);
-                  }}
-                  className="text-center text-2xl tracking-widest uppercase font-mono h-14"
-                  maxLength={6}
-                  required
-                  disabled={isLoading}
-                />
-              </div>
-
-              {error && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
-              <Button type="submit" className="w-full h-12 text-lg" disabled={isLoading || otpValue.length < 6}>
-                {isLoading ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                    Verifying...
-                  </>
-                ) : (
-                  'Verify OTP'
-                )}
-              </Button>
+{showOtpScreen ? (
+          <OtpModal 
+            email={loginData.email} 
+            onSuccess={() => {
+              // ✅ FIX: Use authUser from AuthContext as primary, localStorage as fallback
+              const userRole = authUser?.role || localStorage.getItem('userRole');
+              setShowOtpScreen(false);
+              onClose();
               
-              <div className="text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowOtpScreen(false);
-                    setOtpValue('');
-                    setError(null);
-                  }}
-                  className="text-sm text-gray-500 hover:text-gray-700"
-                  disabled={isLoading}
-                >
-                  Back to login
-                </button>
-              </div>
-            </form>
-          </div>
+              // Role-based redirect
+              if (userRole === 'admin') {
+                navigate('/admin');
+              } else if (userRole === 'owner') {
+                navigate('/owner');
+              } else {
+                // Regular user - navigate to dashboard
+                navigate('/dashboard');
+              }
+            }}
+            onCancel={() => {
+              setShowOtpScreen(false);
+              setError(null);
+            }}
+          />
         ) : (
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'login' | 'register')}>
             <TabsList className="grid w-full grid-cols-2">
@@ -409,14 +388,16 @@ const LoginModal: React.FC<LoginModalProps> = ({
                   </Alert>
                 )}
 
-                <Button type="submit" className="w-full" disabled={isLoading}>
+                <Button type="submit" className="w-full" disabled={isLoading || is429Cooldown}>
                   {isLoading ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Logging in...
+                      Sending OTP...
                     </>
+                  ) : is429Cooldown ? (
+                    `Please wait ${cooldownSeconds}s`
                   ) : (
-                    'Login'
+                    'Login & Send OTP'
                   )}
                 </Button>
 

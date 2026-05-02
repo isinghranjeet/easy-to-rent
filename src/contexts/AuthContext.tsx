@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // src/contexts/AuthContext.tsx
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { api, User, LoginCredentials, RegisterCredentials } from '@/services/api';
+import { api } from '@/services/api';
+import type { User } from '@/types/user';
 import { toast } from 'sonner';
 
 interface AuthContextType {
@@ -39,15 +40,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Listen for unauthorized events
     const handleUnauthorizedEvent = () => {
       console.log('🚨 [AUTH_CONTEXT] Unauthorized event received');
-      // The api.ts has already attempted retry. If we get here, token is truly invalid.
-      // Logout the user.
       setUser(null);
       api.clearToken();
       toast.error('Session expired. Please login again.');
     };
 
-    window.addEventListener('unauthorized', handleUnauthorizedEvent);
-    return () => window.removeEventListener('unauthorized', handleUnauthorizedEvent);
+window.addEventListener('unauthorized', handleUnauthorizedEvent);
+    
+    // ✅ NEW: Listen for userLoggedIn event (dispatched after OTP verification)
+    const handleUserLoggedIn = (event: Event) => {
+      const customEvent = event as CustomEvent<{ user?: User }>;
+      if (customEvent.detail?.user) {
+        console.log('✅ [AUTH_CONTEXT] Received userLoggedIn event with user data:', customEvent.detail.user.role);
+        setUser(customEvent.detail.user);
+        localStorage.setItem('userRole', customEvent.detail.user.role);
+      } else {
+        // Fallback: reload user data from API
+        console.log('✅ [AUTH_CONTEXT] Reloading user data after login event');
+        loadUser();
+      }
+    };
+    window.addEventListener('userLoggedIn', handleUserLoggedIn);
+    
+    return () => {
+      window.removeEventListener('unauthorized', handleUnauthorizedEvent);
+      window.removeEventListener('userLoggedIn', handleUserLoggedIn);
+    };
   }, []);
 
   const refreshSession = async (): Promise<boolean> => {
@@ -66,7 +84,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
       
-      // Try to validate token by loading user profile
       const response = await api.getCurrentUser();
       if (response.success && response.data) {
         console.log('✅ [AUTH_CONTEXT] Session refresh successful');
@@ -91,7 +108,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error: any) {
       console.error('Failed to load user:', error);
-      // Only clear token on 401 auth error, not network errors
       if (error?.status === 401) {
         api.clearToken();
       }
@@ -107,29 +123,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const response = await api.login({ email, password });
       
-      if (response.success && response.data) {
-        // If OTP is required, throw a special error for the UI to catch
-        if (response.data.requireOtp) {
-          const otpError = new Error('OTP_REQUIRED');
-          (otpError as any).requireOtp = true;
-          (otpError as any).email = response.data.email;
-          throw otpError;
-        }
+      // Check if OTP required (Admin login)
+      if (response.data?.requireOtp === true) {
+        const otpError = new Error('OTP_REQUIRED');
+        (otpError as any).email = response.data.email;
+        throw otpError;
+      }
 
-        setUser(response.data.user);
+      // Normal login flow
+      if (response.success && response.data) {
+        const { token, refreshToken, user: userData } = response.data;
         
-        // Store user info in localStorage for persistence
-        localStorage.setItem('userName', response.data.user.name);
-        localStorage.setItem('userEmail', response.data.user.email);
-        if (response.data.user.phone) localStorage.setItem('userPhone', response.data.user.phone);
-        localStorage.setItem('userId', response.data.user._id);
+        if (token) {
+          localStorage.setItem('auth_token', token);
+          api.setToken(token);
+        }
+        if (refreshToken) {
+          localStorage.setItem('auth_refresh_token', refreshToken);
+          api.setRefreshToken(refreshToken);
+        }
         
-        // Dispatch event for wishlist to sync
+        if (userData) {
+          setUser(userData);
+          localStorage.setItem('userRole', userData.role);
+        }
+        
         window.dispatchEvent(new CustomEvent('userLoggedIn'));
-        
-        toast.success('Login successful!', {
-          description: `Welcome back, ${response.data.user.name}!`,
-        });
+        toast.success('Login successful!');
       } else {
         throw new Error(response.message || 'Login failed');
       }
@@ -155,20 +175,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await api.register({ name, email, password, phone, role });
       
       if (response.success && response.data) {
-        setUser(response.data.user);
+        const { token, refreshToken, user: userData } = response.data;
         
-        // Store user info in localStorage
-        localStorage.setItem('userName', response.data.user.name);
-        localStorage.setItem('userEmail', response.data.user.email);
-        if (response.data.user.phone) localStorage.setItem('userPhone', response.data.user.phone);
-        localStorage.setItem('userId', response.data.user._id);
+        if (token) {
+          localStorage.setItem('auth_token', token);
+          api.setToken(token);
+        }
+        if (refreshToken) {
+          localStorage.setItem('auth_refresh_token', refreshToken);
+          api.setRefreshToken(refreshToken);
+        }
         
-        // Dispatch event for wishlist to sync
+        if (userData) {
+          setUser(userData);
+          localStorage.setItem('userRole', userData.role);
+        }
+        
         window.dispatchEvent(new CustomEvent('userLoggedIn'));
-        
-        toast.success('Registration successful!', {
-          description: `Welcome, ${response.data.user.name}!`,
-        });
+        toast.success('Registration successful!');
       } else {
         throw new Error(response.message || 'Registration failed');
       }
@@ -186,20 +210,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await api.logout();
       setUser(null);
+      api.clearToken();
       
-      // Clear localStorage
-      localStorage.removeItem('userName');
-      localStorage.removeItem('userEmail');
-      localStorage.removeItem('userPhone');
-      localStorage.removeItem('userId');
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_refresh_token');
+      localStorage.removeItem('userRole');
       
-      // Dispatch event for wishlist to clear
       window.dispatchEvent(new CustomEvent('userLoggedOut'));
-      
       toast.success('Logged out successfully');
     } catch (error) {
       console.error('Logout error:', error);
-      // Still clear local state even if API call fails
       api.clearToken();
       setUser(null);
     }

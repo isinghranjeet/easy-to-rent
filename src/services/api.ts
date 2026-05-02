@@ -406,16 +406,17 @@ export class ApiService {
 
   private async retryRequest<T>(
     fn: () => Promise<T>,
-    retries: number = this.retryCount
+    retries: number = this.retryCount,
+    endpoint: string = ''
   ): Promise<T> {
     try {
       return await fn();
     } catch (error: any) {
-      if (retries > 0 && error.status === 429) {
+      if (retries > 0 && error.status === 429 && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/verify-login-otp')) {
         const delay = this.retryDelay * Math.pow(2, this.retryCount - retries);
         console.log(`⏳ Rate limited, retrying in ${delay}ms... (${retries} retries left)`);
         await new Promise(resolve => setTimeout(resolve, delay));
-        return this.retryRequest(fn, retries - 1);
+        return this.retryRequest(fn, retries - 1, endpoint);
       }
       throw error;
     }
@@ -644,7 +645,7 @@ export class ApiService {
     const response = await this.request<ApiResponse<any>>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
-    });
+    }, true); // skipCache for auth
 
     if (response.success && response.data) {
       if (response.data.requireOtp) {

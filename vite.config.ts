@@ -7,11 +7,7 @@ import path from 'path';
 export default defineConfig(async () => {
   const plugins: PluginOption[] = [react()];
 
-  // ═══════════════════════════════════════════════════════════════════
-  // Conditionally load vite-plugin-pwa so the dev server doesn't crash
-  // if the package isn't installed yet.
-  // Run: npm install vite-plugin-pwa
-  // ═══════════════════════════════════════════════════════════════════
+  // Conditionally load vite-plugin-pwa
   try {
     const { VitePWA } = await import('vite-plugin-pwa');
     plugins.push(
@@ -35,11 +31,7 @@ export default defineConfig(async () => {
       })
     );
   } catch {
-    console.warn(
-      '\n⚠️  [vite.config.ts] vite-plugin-pwa is not installed.\n' +
-      '    PWA build features are disabled.\n' +
-      '    Run: npm install vite-plugin-pwa\n'
-    );
+    console.warn('\n⚠️ vite-plugin-pwa not installed. PWA disabled.\n');
   }
 
   return {
@@ -53,9 +45,6 @@ export default defineConfig(async () => {
     optimizeDeps: {
       include: ['react', 'react-dom', 'react-router-dom'],
     },
-    define: {
-
-    },
     build: {
       outDir: 'dist',
       sourcemap: false,
@@ -63,36 +52,36 @@ export default defineConfig(async () => {
       rollupOptions: {
         output: {
           manualChunks(id: string) {
-            /* ═══════════════════════════════════════════════════════════════
-               REACT CORE — All React ecosystem packages in ONE chunk.
-               This prevents circular dependencies (vendor → react → vendor)
-               that cause "Cannot read properties of undefined (reading
-               'createContext')" when chunks load out of order.
-               Includes: react, react-dom, scheduler, loose-envify (transitive
-               deps), react-router, react-router-dom, @remix-run.
-               ═══════════════════════════════════════════════════════════════ */
-            if (
-              /[\\/]node_modules[\\/](react|react-dom|scheduler|loose-envify|react-router|react-router-dom|@remix-run)[\\/]/.test(
-                id
-              )
-            ) {
+            // React core - prevents circular deps
+            if (/[\\/]node_modules[\\/](react|react-dom|scheduler|loose-envify|react-router|react-router-dom|@remix-run)[\\/]/.test(id)) {
               return 'react-core';
             }
-            // UI / Charts / Animation
-            if (/[\\/]node_modules[\\/](recharts|framer-motion)[\\/]/.test(id)) {
+            // UI / Charts / Animation libraries
+            if (/[\\/]node_modules[\\/](recharts|framer-motion|lucide-react|@radix-ui|clsx|class-variance-authority)[\\/]/.test(id)) {
               return 'ui-vendor';
             }
             // TanStack Query
             if (/[\\/]node_modules[\\/](@tanstack)[\\/]/.test(id)) {
               return 'query-vendor';
             }
-            // Large utility libraries
-            if (/[\\/]node_modules[\\/](lodash|moment)[\\/]/.test(id)) {
+            // Map libraries (lazy loaded)
+            if (/[\\/]node_modules[\\/](leaflet|react-leaflet)[\\/]/.test(id)) {
+              return 'map-vendor';
+            }
+            // Utility libraries
+            if (/[\\/]node_modules[\\/](lodash|moment|dayjs)[\\/]/.test(id)) {
               return 'utils-vendor';
             }
             // Everything else from node_modules
             if (id.includes('node_modules')) {
               return 'vendor';
+            }
+            // Split components by route
+            if (id.includes('/pages/')) {
+              return 'pages';
+            }
+            if (id.includes('/admin/')) {
+              return 'admin';
             }
           },
           chunkFileNames: 'assets/js/[name]-[hash].js',
@@ -112,7 +101,12 @@ export default defineConfig(async () => {
           },
         },
       },
-      chunkSizeWarningLimit: 600,
+      chunkSizeWarningLimit: 500,
+      target: 'esnext',
+      treeShaking: true,
+    },
+    deps: {
+      inline: [/^lodash$/, /^clsx$/, /^dayjs$/],
     },
   };
 });
